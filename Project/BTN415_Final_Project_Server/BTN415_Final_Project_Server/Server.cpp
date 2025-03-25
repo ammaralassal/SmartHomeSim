@@ -47,6 +47,26 @@ void load()
 }
 
 /// <summary>
+/// Check if a user is logged in
+/// </summary>
+/// <param name="username">The user to check</param>
+/// <returns>True if they are logged in; false otherwise</returns>
+bool isLoggedIn(const std::string& username)
+{
+    // Take control of the lock
+    mu_loggedInUsers.lock();
+
+    // Check if the user is already logged in
+    auto index = std::find(loggedInUsers.begin(), loggedInUsers.end(), username);
+    bool loggedIn = index == loggedInUsers.end();
+
+    // Release control of the lock
+    mu_loggedInUsers.unlock();
+
+    return loggedIn;
+}
+
+/// <summary>
 /// Check if the user is already logged in. If not, make sure their credentials are valid and log them in
 /// </summary>
 /// <param name="clientSocket">The socket</param>
@@ -156,17 +176,7 @@ bool getLights(SOCKET& clientSocket, const std::string& username)
     std::string response;
     bool succeeded = false;
 
-    // Take control of the lock
-    mu_loggedInUsers.lock();
-
-    // Check if the user is already logged in
-    auto index = std::find(loggedInUsers.begin(), loggedInUsers.end(), username);
-    bool loggedIn = index == loggedInUsers.end();
-
-    // Release control of the lock
-    mu_loggedInUsers.unlock();
-
-    if (loggedIn)
+    if (isLoggedIn(username))
     {
         // The user attempting to view the inventory is not logged in so they request must be rejected
         response = "Failed. Server does not recognise the user as being logged in.";
@@ -206,23 +216,19 @@ bool getLights(SOCKET& clientSocket, const std::string& username)
     return succeeded;
 }
 
+/// <summary>
+/// Returns information regarding all of the smart thermostats to logged in users
+/// </summary>
+/// <param name="clientSocket">The socket</param>
+/// <param name="username">The username of the user making the request</param>
+/// <returns>True if valid information is able to be returned; false otherwise</returns>
 bool getThermostat(SOCKET& clientSocket, std::string& username)
 {
     // Message to send back to client
     std::string response;
     bool succeeded = false;
 
-    // Take control of the lock
-    mu_loggedInUsers.lock();
-
-    // Check if the user is already logged in
-    auto index = std::find(loggedInUsers.begin(), loggedInUsers.end(), username);
-    bool loggedIn = index == loggedInUsers.end();
-
-    // Release control of the lock
-    mu_loggedInUsers.unlock();
-
-    if (loggedIn)
+    if (isLoggedIn(username))
     {
         // The user attempting to view the inventory is not logged in so they request must be rejected
         response = "Failed. Server does not recognise the user as being logged in.";
@@ -274,17 +280,7 @@ bool getCameras(SOCKET& clientSocket, std::string& username)
     std::string response;
     bool succeeded = false;
 
-    // Take control of the lock
-    mu_loggedInUsers.lock();
-
-    // Check if the user is already logged in
-    auto index = std::find(loggedInUsers.begin(), loggedInUsers.end(), username);
-    bool loggedIn = index == loggedInUsers.end();
-
-    // Release control of the lock
-    mu_loggedInUsers.unlock();
-
-    if (loggedIn)
+    if (isLoggedIn(username))
     {
         // The user attempting to view the inventory is not logged in so they request must be rejected
         response = "Failed. Server does not recognise the user as being logged in.";
@@ -325,7 +321,7 @@ bool getCameras(SOCKET& clientSocket, std::string& username)
 }
 
 /// <summary>
-/// Returns whether a device is on or off
+/// Returns information regarding a smart device
 /// </summary>
 /// <param name="clientSocket">The socket</param>
 /// <param name="requestDetails">The details of the request</param>
@@ -341,17 +337,8 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
     std::string username = requestDetails.substr(0, requestDetails.find(" "));
     requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
 
-    // Take control of the lock
-    mu_loggedInUsers.lock();
-
-    // Check if the user is already logged in
-    auto index = std::find(loggedInUsers.begin(), loggedInUsers.end(), username);
-    bool loggedIn = index == loggedInUsers.end();
-
-    // Release control of the lock
-    mu_loggedInUsers.unlock();
-
-    if (loggedIn)
+    // Check if the user is logged in
+    if (isLoggedIn(username))
     {
         // The user attempting to view the inventory is not logged in so they request must be rejected
         response = "Failed. Server does not recognise the user as being logged in.";
@@ -578,6 +565,224 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
     return succeeded;
 }
 
+/// <summary>
+/// Attempts to modify a smart device 
+/// </summary>
+/// <param name="clientSocket">The socket</param>
+/// <param name="requestDetails">The details of the modification request</param>
+/// <param name="requestType">The type attribute to modify</param>
+/// <returns>True if request could be fulfilled; false otherwise</returns>
+bool putDetails(SOCKET& clientSocket, std::string& requestDetails, const std::string& requestType)
+{
+    // Message to send back to client
+    std::string response;
+    bool succeeded = false;
+
+    // Extract the username from the request details
+    std::string username = requestDetails.substr(0, requestDetails.find(" "));
+    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+
+    // Check if the user is logged in
+    if (isLoggedIn(username))
+    {
+        // The user attempting to view the inventory is not logged in so they request must be rejected
+        response = "Failed. Server does not recognise the user as being logged in.";
+
+    }
+    else
+    {
+        // This account is logged in, extract device type
+        std::string deviceType = requestDetails.substr(0, requestDetails.find(" "));
+        requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+        // Extract the device number (index in array will be 1 less than user selection)
+        int deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find(" "))) - 1;
+        requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+
+
+        // Take control of the approperiate lock
+        if (deviceType == "L")
+        {
+            // Device is a Light
+            mu_lights.lock();
+
+            if (lights.size() > 0 && deviceNumber < lights.size())
+            {
+                // Valid light, try to fulfil request
+                if (requestType == "ON")
+                {
+                    // Try to turn the light on
+                    succeeded = lights[deviceNumber].turnOn();
+                    if (succeeded)
+                    {
+                        // The light was sucessfully turned on
+                        response = "Succeeded. The light has been turned on.";
+                    }
+                    else
+                    {
+                        // The light was already on
+                        response = "Failed. The light was already turned on, nothing has happened.";
+                    }
+                }
+                else if (requestType == "OF")
+                {
+                    // Try to turn the light off
+                    succeeded = lights[deviceNumber].turnOff();
+                    if (succeeded)
+                    {
+                        // The light was sucessfully turned off
+                        response = "Succeeded. The light has been turned off.";
+                    }
+                    else
+                    {
+                        // The light was already off
+                        response = "Failed. The light was already turned off, nothing has happened.";
+                    }
+                }
+                else if (requestType == "RB")
+                {
+                    // Replace the light bulb
+                    response += "Succeeded. The light bulb has been replaced.";
+                    lights[deviceNumber].replaceBulb();
+                }
+            }
+            else
+            {
+                // No light information could be delivered, the light does not exist
+                response = "Failed. That is not recognised as a valid light.";
+            }
+
+            // Release control of the lock
+            mu_lights.unlock();
+        }
+        else if (deviceType == "C")
+        {
+            // Device is a Camera
+            mu_cameras.lock();
+
+            if (cameras.size() > 0 && deviceNumber < cameras.size())
+            {
+                // Valid camera, try to fulfil request
+                if (requestType == "ON")
+                {
+                    // Try to turn the camera on
+                    succeeded = cameras[deviceNumber].turnOn();
+                    if (succeeded)
+                    {
+                        // The camera was sucessfully turned on
+                        response = "Succeeded. The camera has been turned on.";
+                    }
+                    else
+                    {
+                        // The camera was already on
+                        response = "Failed. The camera was already turned on, nothing has happened.";
+                    }
+                }
+                else if (requestType == "OF")
+                {
+                    // Try to turn the camera off
+                    succeeded = cameras[deviceNumber].turnOff();
+                    if (succeeded)
+                    {
+                        // The camera was sucessfully turned off
+                        response = "Succeeded. The camera has been turned off.";
+                    }
+                    else
+                    {
+                        // The camera was already off
+                        response = "Failed. The camera was already turned off, nothing has happened.";
+                    }
+                }
+                else if (requestType == "EM")
+                {
+                    // Empty the memory
+                    response += "Succeeded. The camera's memory has been emptied.";
+                    succeeded = cameras[deviceNumber].wipeMemory();
+                }
+            }
+            else
+            {
+                // No camera information could be delivered, the camera does not exist
+                response = "Failed. That is not recognised as a valid camera.";
+            }
+
+            // Release control of the lock
+            mu_cameras.unlock();
+        }
+        else if (deviceType == "T")
+        {
+            // Device is a Thermostat
+            mu_thermostats.lock();
+
+            if (thermostats.size() > 0 && deviceNumber < thermostats.size())
+            {
+                // Valid thermostat, try to fulfil request
+                if (requestType == "ON")
+                {
+                    // Try to turn the thermostat on
+                    succeeded = thermostats[deviceNumber].turnOn();
+                    if (succeeded)
+                    {
+                        // The thermostat was sucessfully turned on
+                        response = "Succeeded. The thermostat has been turned on.";
+                    }
+                    else
+                    {
+                        // The thermostat was already on
+                        response = "Failed. The thermostat was already turned on, nothing has happened.";
+                    }
+                }
+                else if (requestType == "OF")
+                {
+                    // Try to turn the thermostat off
+                    succeeded = thermostats[deviceNumber].turnOff();
+                    if (succeeded)
+                    {
+                        // The thermostat was sucessfully turned off
+                        response = "Succeeded. The thermostat has been turned off.";
+                    }
+                    else
+                    {
+                        // The thermostat was already off
+                        response = "Failed. The thermostat was already turned off, nothing has happened.";
+                    }
+                }
+                else if (requestType == "ST")
+                {
+                    // Extract the new temperature
+                    int newTemp = std::stoi(requestDetails.substr(0, requestDetails.find(" ")));
+                    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+
+                    // Try to set a new temperature
+                    succeeded = thermostats[deviceNumber].setDesiredTemperature(newTemp);
+                    if (succeeded)
+                    {
+                        // The thermostat was sucessfully set
+                        response = "Succeeded. The thermostat has been set.";
+                    }
+                    else
+                    {
+                        // The thermostat was already off
+                        response = "Failed. The thermostat was not able to be set.";
+                    }
+                }
+            }
+            else
+            {
+                // No thermostat information could be delivered, the thermostat does not exist
+                response = "Failed. That is not recognised as a valid thermostat.";
+            }
+
+            // Release control of the lock
+            mu_thermostats.unlock();
+        }
+    }
+
+    // Send response to user
+    send(clientSocket, response.c_str(), response.size(), 0);
+
+    return succeeded;
+}
+
 int find_available_socket(void) {
     int socket_number = MAX_SOCKETS;
     for (int i = 0; i < MAX_SOCKETS; i++) {
@@ -612,7 +817,7 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
             std::string requestDetails = clientRequest.substr(clientRequest.find(" ") + 1);
 
             // Process client choice
-            if (action == "In") {
+            if (action == "POST/IN") {
                 // Try to sign the user in
                 signIn(ClientSockets[Index], requestDetails, usernames, passwords);
             }
@@ -659,6 +864,26 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
             else if (action == "GET/ST") {
                 // Client wants a full status report on a device
                 getDetails(ClientSockets[Index], requestDetails, "ST");
+            }
+            else if (action == "PUT/ON") {
+                // Client wants to turn on a device
+                putDetails(ClientSockets[Index], requestDetails, "ON");
+            }
+            else if (action == "PUT/OF") {
+                // Client wants to turn off a device
+                putDetails(ClientSockets[Index], requestDetails, "OF");
+            }
+            else if (action == "PUT/RB") {
+                // Client wants to replace a light's bulb
+                putDetails(ClientSockets[Index], requestDetails, "RB");
+            }
+            else if (action == "PUT/ST") {
+                // Client wants to set a new desired temperature for a thermostat
+                putDetails(ClientSockets[Index], requestDetails, "ST");
+            }
+            else if (action == "PUT/EM") {
+                // Client wants to empty a camera's memory
+                putDetails(ClientSockets[Index], requestDetails, "EM");
             }
             else if (action == "Out") {
                 // Try to sign out the user

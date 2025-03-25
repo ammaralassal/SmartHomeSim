@@ -32,7 +32,7 @@ namespace seneca
 
 		// Turn off
 		m_on = false;
-		return false;
+		return true;
 	}
 
 	bool SmartDevices::getOn()

@@ -43,7 +43,8 @@ namespace seneca
         /// Set the house's desired temperature
         /// </summary>
         /// <param name="newTemp">The new desired temperature</param>
-        void setDesiredTemperature(const int& newTemp);
+        /// <returns>True if temperature was set; false otherwise</returns>
+        bool setDesiredTemperature(const int& newTemp);
 
         /// <summary>
         /// The current and the desired temperature, whether the thermostat is heating or cooling the house

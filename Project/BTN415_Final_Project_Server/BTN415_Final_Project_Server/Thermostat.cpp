@@ -20,14 +20,20 @@ namespace seneca
 		return m_desiredTemperature;
 	}
 
-	void Thermostat::setDesiredTemperature(const int& newTemp)
+	bool Thermostat::setDesiredTemperature(const int& newTemp)
 	{
-		m_desiredTemperature = newTemp;
+		// Validate the temperature
+		if (newTemp >= 2 && newTemp <= 35)
+		{
+			m_desiredTemperature = newTemp;
+			return true;
+		}
+		return false;
 	}
 
 	std::string Thermostat::getStatus()
 	{
-		std::string status = "The current temperature recorded by the thermostat in the " + getLocation() + " is " + std::to_string(m_currentTemperature) + "C and the desired temperature is " + std::to_string(m_currentTemperature) + "C,";
+		std::string status = "The current temperature recorded by the thermostat in the " + getLocation() + " is " + std::to_string(m_currentTemperature) + "C and the desired temperature is " + std::to_string(m_desiredTemperature) + "C,";
 		if (getOn())
 		{
 			// The thermostat is on

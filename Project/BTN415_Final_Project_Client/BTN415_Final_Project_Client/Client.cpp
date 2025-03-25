@@ -5,6 +5,40 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 /// <summary>
+/// Get a valid menu choice from the user
+/// </summary>
+/// <param name="min">The minimum number value the user could have entered</param>
+/// <param name="max">The maximum number value the user could have entered</param>
+/// <returns>The choice as a string</returns>
+std::string getMenuChoice(const int& min, const int& max)
+{
+    std::string choice = "";
+    // Collect a valid choice from the user (assume it's not valid)
+    bool validChoice = false;
+    while (!validChoice)
+    {
+        // Collect a valid choice from the user
+        std::cout << "Enter your choice (number): ";
+        std::cin >> choice;
+
+        // Check if choice was valid
+        if (std::stoi(choice) < min || std::stoi(choice) > max)
+        {
+            // Choice was invalid, inform user and try again
+            std::cout << "Whoops, " << choice << " wasn't a valid option. Please try again with a number between " << min << " and " << max << ", inclusive.\n\n";
+        }
+        else
+        {
+            // The user's choice was valid
+            validChoice = true;
+        }
+    }
+
+    return choice;
+}
+
+
+/// <summary>
 /// Send a request to the server for information pertaining to a specific device
 /// </summary>
 /// <param name="deviceType">The type of smart device being queired</param>
@@ -45,43 +79,65 @@ bool getDetails(const std::string& deviceType, const std::string& requestType, S
     else
     {
         // Request failed, inform user of why
-        std::cout << "\nThe request for the device's on/off status failed." << details << std::endl << std::endl;
+        std::cout << "\nThe request for information failed." << details << std::endl << std::endl;
     }
 
     return succeeded;
 }
 
 /// <summary>
-/// Get a valid menu choice from the user
+/// Sends put requests to the sever to update the state of a smart device
 /// </summary>
-/// <param name="min">The minimum number value the user could have entered</param>
-/// <param name="max">The maximum number value the user could have entered</param>
-/// <returns>The choice as a string</returns>
-std::string getMenuChoice(const int& min, const int& max)
+/// <param name="deviceType">The type of device to be updated</param>
+/// <param name="requestType">The type of request being made</param>
+/// <param name="ClientSocket">The socket</param>
+/// <param name="username">The user making the request</param>
+/// <param name="deviceNum">The device number</param>
+/// <returns>True if device was successfully updated; false otherwise</returns>
+bool putDetails(const std::string& deviceType, const std::string& requestType, SOCKET& ClientSocket, const std::string& username, const std::string& deviceNum)
 {
-    std::string choice = "";
-    // Collect a valid choice from the user (assume it's not valid)
-    bool validChoice = false;
-    while (!validChoice)
-    {
-        // Collect a valid choice from the user
-        std::cout << "Enter your choice (number): ";
-        std::cin >> choice;
+    // Flag to indicate if request succedded (assume failure)
+    bool succeeded = false;
 
-        // Check if choice was valid
-        if (std::stoi(choice) < min || std::stoi(choice) > max)
-        {
-            // Choice was invalid, inform user and try again
-            std::cout << "Whoops, " << choice << " wasn't a valid option. Please try again with a number between " << min << " and " << max << ", inclusive.\n\n";
-        }
-        else
-        {
-            // The user's choice was valid
-            validChoice = true;
-        }
+    // Make a 'GET' request to see if the light is on
+    std::string requestString = "PUT/" + requestType + " " + username + " " + deviceType + " " + deviceNum;
+
+    if (requestType == "ST")
+    {
+        // User wants to set a new temperature, prompt for new temperature
+        std::cout << "\nWhat temperature would you like to set the thermostat for? Please note, your temperature must be a whole number between 2 and 35 degrees C.\n";
+        // Collect the user's choice
+        requestString += " " + getMenuChoice(2, 35);
     }
 
-    return choice;
+    // Send request to server
+    send(ClientSocket, requestString.c_str(), requestString.length(), 0);
+
+    // Response buffer
+    char buffer[1024] = { 0 };
+    // Receive and display response
+    recv(ClientSocket, buffer, 1024, 0);
+    std::string serverResponse(buffer);
+
+    // Break up the response message for interpretation
+    std::string result = serverResponse.substr(0, serverResponse.find("."));
+    std::string details = serverResponse.substr(serverResponse.find(".") + 2);
+
+    if (result == "Succeeded")
+    {
+        // Request succeeded
+        succeeded = true;
+
+        // Inform user
+        std::cout << std::endl << details << std::endl << std::endl;
+    }
+    else
+    {
+        // Request failed, inform user of why
+        std::cout << "\nThe action has failed. " << details << std::endl << std::endl;
+    }
+
+    return succeeded;
 }
 
 /// <summary>
@@ -97,7 +153,7 @@ bool login(SOCKET& clientSocket, std::string& username) {
     if (username == "")
     {
         // User is not currently logged in, a log-in attempt can be made, store the request into a string
-        std::string requestString = "In ";
+        std::string requestString = "POST/IN ";
         std::string inputUsername, inputPassword;
 
         // Collect the username
@@ -174,11 +230,11 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
             break;
         case 2:
             // Try to turn the light on
-            //putOn("L", ClientSocket, username, lightNum);
+            putDetails("L", "ON", ClientSocket, username, lightNum);
             break;
         case 3:
             // Try to turn the light off
-            //putOff("L", ClientSocket, username, lightNum);
+            putDetails("L", "OF", ClientSocket, username, lightNum);
             break;
         case 4:
             // Check if the bulb has burned out
@@ -186,7 +242,7 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
             break;
         case 5:
             // Try to replace the bulb
-            //putNewLightBulb(ClientSocket, username, lightNum);
+            putDetails("L", "RB", ClientSocket, username, lightNum);
             break;
         case 6:
             // Check if the location
@@ -231,11 +287,11 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
             break;
         case 2:
             // Try to turn the thermostat on
-            //putOn("T", ClientSocket, username, thermostatNum);
+            putDetails("T", "ON", ClientSocket, username, thermostatNum);
             break;
         case 3:
             // Try to turn the thermostat off
-            //putOff("T", ClientSocket, username, thermostatNum);
+            putDetails("T", "OF", ClientSocket, username, thermostatNum);
             break;
         case 4:
             // Check the current temperature
@@ -247,7 +303,7 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
             break;
         case 6:
             // Change the desired temperature
-            //putNewTemperature(ClientSocket, username, thermostatNum);
+            putDetails("T", "ST", ClientSocket, username, thermostatNum);
             break;
         case 7:
             // Check if the location
@@ -292,11 +348,11 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
             break;
         case 2:
             // Try to turn the camera on
-            //putOn("C", ClientSocket, username, cameraNum);
+            putDetails("C", "ON", ClientSocket, username, cameraNum);
             break;
         case 3:
             // Try to turn the camera off
-            //putOff("C", ClientSocket, username, cameraNum);
+            putDetails("C", "OF", ClientSocket, username, cameraNum);
             break;
         case 4:
             // Check the memory is full
@@ -304,7 +360,7 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
             break;
         case 5:
             // Try to empty the memory
-            //putEmptyMemory(ClientSocket, username, cameraNum);
+            putDetails("C", "EM", ClientSocket, username, cameraNum);
             break;
         case 6:
             // Check the location

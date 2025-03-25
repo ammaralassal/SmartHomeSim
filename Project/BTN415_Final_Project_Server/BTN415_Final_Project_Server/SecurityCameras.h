@@ -32,7 +32,8 @@ namespace seneca
         /// <summary>
         /// Wipes the camera's memory so that the memory is no longer full, regardless of what it was at before
         /// </summary>
-        void wipeMemory();
+        /// <returns>True to indicate the memory was wiped</returns>
+        bool wipeMemory();
 
         /// <summary>
         /// Checks if the camera is out of memory

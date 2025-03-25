@@ -10,10 +10,12 @@ namespace seneca {
 
     }
 
-    void SecurityCameras::wipeMemory()
+    bool SecurityCameras::wipeMemory()
     {
         // Reset the memory so that it is no longer full
         m_memoryIsFull = false;
+
+        return true;
     }
 
     bool SecurityCameras::getMemoryIsFull()
