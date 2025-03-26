@@ -36,6 +36,7 @@ SOCKET Aux_Socket;
 SOCKET ClientSockets[MAX_SOCKETS + 1] = { SOCKET_ERROR };
 bool Active_Sockets[MAX_SOCKETS + 1] = { false };
 
+// Basic implementation for testing, not done
 void load()
 {
     // Just load one light for now for testing purposes
@@ -82,8 +83,8 @@ bool signIn(SOCKET& clientSocket, const std::string& credentials, const std::vec
     bool succeeded = false;
 
     // Get the user's credentials from the client's request
-    std::string username = credentials.substr(0, credentials.find(" "));
-    std::string password = credentials.substr(credentials.find(" ") + 1);
+    std::string username = credentials.substr(0, credentials.find("/"));
+    std::string password = credentials.substr(credentials.find("/") + 1);
 
     // Take control of the lock
     mu_loggedInUsers.lock();
@@ -165,177 +166,26 @@ bool signOut(SOCKET& clientSocket, const std::string& username)
 }
 
 /// <summary>
-/// Returns information regarding all of the smart lights to logged in users
-/// </summary>
-/// <param name="clientSocket">The socket</param>
-/// <param name="username">The username of the user making the request</param>
-/// <returns>True if valid information is able to be returned; false otherwise</returns>
-bool getLights(SOCKET& clientSocket, const std::string& username)
-{
-    // Message to send back to client
-    std::string response;
-    bool succeeded = false;
-
-    if (isLoggedIn(username))
-    {
-        // The user attempting to view the inventory is not logged in so they request must be rejected
-        response = "Failed. Server does not recognise the user as being logged in.";
-
-    }
-    else
-    {
-        // This account is logged in, take control of the lock
-        mu_lights.lock();
-
-        if (lights.size() > 0)
-        {
-            // There are lights in the house, format the light data and send it back
-            response = "Succeeded. ";
-
-            for (int i = 0; i < lights.size(); ++i)
-            {
-                // Add the identifying information of the light to the string
-                response += lights[i].getLocation() + " ";
-            }
-        }
-        else
-        {
-            // No light information could be delivered, no lights exist
-            response = "Failed. There are no smart lights in the house.";
-        }
-
-        // Release control of the lock
-        mu_lights.unlock();
-
-        succeeded = true;
-    }
-
-    // Send response to client
-    send(clientSocket, response.c_str(), response.size(), 0);
-
-    return succeeded;
-}
-
-/// <summary>
-/// Returns information regarding all of the smart thermostats to logged in users
-/// </summary>
-/// <param name="clientSocket">The socket</param>
-/// <param name="username">The username of the user making the request</param>
-/// <returns>True if valid information is able to be returned; false otherwise</returns>
-bool getThermostat(SOCKET& clientSocket, std::string& username)
-{
-    // Message to send back to client
-    std::string response;
-    bool succeeded = false;
-
-    if (isLoggedIn(username))
-    {
-        // The user attempting to view the inventory is not logged in so they request must be rejected
-        response = "Failed. Server does not recognise the user as being logged in.";
-
-    }
-    else
-    {
-        // This account is logged in, take control of the lock
-        mu_thermostats.lock();
-
-        if (thermostats.size() > 0)
-        {
-            // There are thermostats in the house, format the thermostat data and send it back
-            response = "Succeeded. ";
-
-            for (int i = 0; i < thermostats.size(); ++i)
-            {
-                // Add the identifying information of the thermostats to the string
-                response += thermostats[i].getLocation() + " ";
-            }
-        }
-        else
-        {
-            // No thermostat information could be delivered, no thermostats exist
-            response = "Failed. There are no smart security thermostats in the house.";
-        }
-
-        // Release control of the lock
-        mu_thermostats.unlock();
-
-        succeeded = true;
-    }
-
-    // Send response to client
-    send(clientSocket, response.c_str(), response.size(), 0);
-
-    return succeeded;
-}
-
-/// <summary>
-/// Returns information regarding all of the smart security cameras to logged in users
-/// </summary>
-/// <param name="clientSocket">The socket</param>
-/// <param name="username">The username of the user making the request</param>
-/// <returns>True if valid information is able to be returned; false otherwise</returns>
-bool getCameras(SOCKET& clientSocket, std::string& username)
-{
-    // Message to send back to client
-    std::string response;
-    bool succeeded = false;
-
-    if (isLoggedIn(username))
-    {
-        // The user attempting to view the inventory is not logged in so they request must be rejected
-        response = "Failed. Server does not recognise the user as being logged in.";
-
-    }
-    else
-    {
-        // This account is logged in, take control of the lock
-        mu_cameras.lock();
-
-        if (cameras.size() > 0)
-        {
-            // There are lights in the house, format the camera data and send it back
-            response = "Succeeded. ";
-
-            for (int i = 0; i < cameras.size(); ++i)
-            {
-                // Add the identifying information of the camera to the string
-                response += cameras[i].getLocation() + " ";
-            }
-        }
-        else
-        {
-            // No light information could be delivered, no cameras exist
-            response = "Failed. There are no smart security cameras in the house.";
-        }
-
-        // Release control of the lock
-        mu_cameras.unlock();
-
-        succeeded = true;
-    }
-
-    // Send response to client
-    send(clientSocket, response.c_str(), response.size(), 0);
-
-    return succeeded;
-}
-
-/// <summary>
 /// Returns information regarding a smart device
 /// </summary>
 /// <param name="clientSocket">The socket</param>
 /// <param name="requestDetails">The details of the request</param>
-/// <param name="requestType">The type of information being requested</param>
 /// <returns>True if request could be fulfilled; false otherwise</returns>
-bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::string& requestType)
+bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
 {
     // Message to send back to client
     std::string response;
     bool succeeded = false;
 
+    // Extract the device type from the request details
+    std::string deviceType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+    // Extract the request type from the request details
+    std::string requestType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
     // Extract the username from the request details
-    std::string username = requestDetails.substr(0, requestDetails.find(" "));
-    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+    std::string username = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
     // Check if the user is logged in
     if (isLoggedIn(username))
@@ -346,11 +196,8 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
     }
     else
     {
-        // This account is logged in, extract device type
-        std::string deviceType = requestDetails.substr(0, requestDetails.find(" "));
-        requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
         // Extract the device number (index in array will be 1 less than user selection)
-        int deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find(" "))) - 1;
+        int deviceNumber =  deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find(" "))) - 1;
         requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
 
 
@@ -360,9 +207,30 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
             // Device is a Light
             mu_lights.lock();
 
-            if (lights.size() > 0 && deviceNumber < lights.size())
+            if (requestType == "AL")
             {
-                // Valid light
+                // Request is for all lights
+                if (lights.size() > 0)
+                {
+                    // There are lights in the house, format the light data and send it back
+                    response = "Succeeded. ";
+                    succeeded = true;
+
+                    for (int i = 0; i < lights.size(); ++i)
+                    {
+                        // Add the identifying information of the light to the string
+                        response += lights[i].getLocation() + " ";
+                    }
+                }
+                else
+                {
+                    // No light information could be delivered, no lights exist
+                    response = "Failed. There are no smart lights in the house.";
+                }
+            }
+            else if (lights.size() > 0 && deviceNumber < lights.size())
+            {
+                // Request is for 1 valid light
                 response = "Succeeded. ";
                 succeeded = true;
                 
@@ -424,9 +292,30 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
             // Device is a Camera
             mu_cameras.lock();
 
-            if (cameras.size() > 0 && deviceNumber < cameras.size())
+            if (requestType == "AL")
             {
-                // Valid camera
+                // Request is for all cameras
+                if (cameras.size() > 0)
+                {
+                    // There are lights in the house, format the camera data and send it back
+                    response = "Succeeded. ";
+                    succeeded = true;
+
+                    for (int i = 0; i < cameras.size(); ++i)
+                    {
+                        // Add the identifying information of the camera to the string
+                        response += cameras[i].getLocation() + " ";
+                    }
+                }
+                else
+                {
+                    // No light information could be delivered, no cameras exist
+                    response = "Failed. There are no smart security cameras in the house.";
+                }
+            }
+            else if (cameras.size() > 0 && deviceNumber < cameras.size())
+            {
+                // Request is for 1 valid camera
                 response = "Succeeded. ";
                 succeeded = true;
 
@@ -504,9 +393,30 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
             // Device is a Thermostat
             mu_thermostats.lock();
 
-            if (thermostats.size() > 0 && deviceNumber < thermostats.size())
+            if (requestType == "AL")
             {
-                // Valid thermostat
+                // Request is for all thermostats
+                if (thermostats.size() > 0)
+                {
+                    // There are thermostats in the house, format the thermostat data and send it back
+                    response = "Succeeded. ";
+                    succeeded = true;
+
+                    for (int i = 0; i < thermostats.size(); ++i)
+                    {
+                        // Add the identifying information of the thermostats to the string
+                        response += thermostats[i].getLocation() + " ";
+                    }
+                }
+                else
+                {
+                    // No thermostat information could be delivered, no thermostats exist
+                    response = "Failed. There are no smart thermostats in the house.";
+                }
+            }
+            else if (thermostats.size() > 0 && deviceNumber < thermostats.size())
+            {
+                // Request is for 1 valid thermostat
                 response = "Succeeded. ";
                 succeeded = true;
 
@@ -570,17 +480,22 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
 /// </summary>
 /// <param name="clientSocket">The socket</param>
 /// <param name="requestDetails">The details of the modification request</param>
-/// <param name="requestType">The type attribute to modify</param>
 /// <returns>True if request could be fulfilled; false otherwise</returns>
-bool putDetails(SOCKET& clientSocket, std::string& requestDetails, const std::string& requestType)
+bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
 {
     // Message to send back to client
     std::string response;
     bool succeeded = false;
 
+    // Extract the device type from the request details
+    std::string deviceType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+    // Extract the request type from the request details
+    std::string requestType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
     // Extract the username from the request details
-    std::string username = requestDetails.substr(0, requestDetails.find(" "));
-    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+    std::string username = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
     // Check if the user is logged in
     if (isLoggedIn(username))
@@ -591,12 +506,9 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
     }
     else
     {
-        // This account is logged in, extract device type
-        std::string deviceType = requestDetails.substr(0, requestDetails.find(" "));
-        requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
         // Extract the device number (index in array will be 1 less than user selection)
-        int deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find(" "))) - 1;
-        requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+        int deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find("/"))) - 1;
+        requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
 
         // Take control of the approperiate lock
@@ -749,8 +661,8 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
                 else if (requestType == "ST")
                 {
                     // Extract the new temperature
-                    int newTemp = std::stoi(requestDetails.substr(0, requestDetails.find(" ")));
-                    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+                    int newTemp = std::stoi(requestDetails.substr(0, requestDetails.find("/")));
+                    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
                     // Try to set a new temperature
                     succeeded = thermostats[deviceNumber].setDesiredTemperature(newTemp);
@@ -783,6 +695,27 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails, const std::st
     return succeeded;
 }
 
+// Not implemented yet
+bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
+{
+    // Message to send back to client
+    std::string response;
+    bool succeeded = false;
+
+    // Extract the device type from the request details
+    std::string deviceType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+    // Extract the request type from the request details
+    std::string requestType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+    // Extract the username from the request details
+    std::string username = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+    return succeeded;
+
+}
+
 int find_available_socket(void) {
     int socket_number = MAX_SOCKETS;
     for (int i = 0; i < MAX_SOCKETS; i++) {
@@ -813,81 +746,41 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
             std::string response;
 
             // Get the action from the client's request
-            std::string action = clientRequest.substr(0, clientRequest.find(" "));
-            std::string requestDetails = clientRequest.substr(clientRequest.find(" ") + 1);
+            std::string action = clientRequest.substr(0, clientRequest.find("/"));
+            std::string requestDetails = clientRequest.substr(clientRequest.find("/") + 1);
+
+            /* Instead of the mess that is below, just extract the action word as a variable, and extract the request type as a variable (change get/l to get/al/L)*/
 
             // Process client choice
-            if (action == "POST/IN") {
-                // Try to sign the user in
-                signIn(ClientSockets[Index], requestDetails, usernames, passwords);
+            if (action == "POST") {
+                // Check if request has to do with user
+                std::string type = requestDetails.substr(0, requestDetails.find("/"));
+                requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+                // Check if the type is user (trying to log in)
+                if (type == "USER")
+                {
+                    signIn(ClientSockets[Index], requestDetails, usernames, passwords);
+                }
             }
-            else if (action == "GET/L") {
-                // Lights have been selected by the client
-                getLights(ClientSockets[Index], requestDetails);
+            else if (action == "GET") {
+                // Request device's information
+                getDetails(ClientSockets[Index], requestDetails);
             }
-            else if (action == "GET/T") {
-                // Thermostat has been selected by the client
-                getThermostat(ClientSockets[Index], requestDetails);
+            else if (action == "PUT") {
+                // Update device's information
+                putDetails(ClientSockets[Index], requestDetails);
             }
-            else if (action == "GET/C") {
-                // Cameras have been selected by the client
-                getCameras(ClientSockets[Index], requestDetails);
-            }
-            else if (action == "GET/ON") {
-                // Client wants to know if a device is on
-                getDetails(ClientSockets[Index], requestDetails, "ON");
-            }
-            else if (action == "GET/LO") {
-                // Client wants to know the location of a device
-                getDetails(ClientSockets[Index], requestDetails, "LO");
-            }
-            else if (action == "GET/BO") {
-                // Client wants to know if a light bulb has burnt out
-                getDetails(ClientSockets[Index], requestDetails, "BO");
-            }
-            else if (action == "GET/MA") {
-                // Client wants to know if a camera is motion activated
-                getDetails(ClientSockets[Index], requestDetails, "MA");
-            }
-            else if (action == "GET/MF") {
-                // Client wants to know if a camera's memory is full
-                getDetails(ClientSockets[Index], requestDetails, "MF");
-            }
-            else if (action == "GET/CT") {
-                // Client wants to know the current temperature
-                getDetails(ClientSockets[Index], requestDetails, "CT");
-            }
-            else if (action == "GET/DT") {
-                // Client wants to know what temperature a thermostat is set to
-                getDetails(ClientSockets[Index], requestDetails, "DT");
-            }
-            else if (action == "GET/ST") {
-                // Client wants a full status report on a device
-                getDetails(ClientSockets[Index], requestDetails, "ST");
-            }
-            else if (action == "PUT/ON") {
-                // Client wants to turn on a device
-                putDetails(ClientSockets[Index], requestDetails, "ON");
-            }
-            else if (action == "PUT/OF") {
-                // Client wants to turn off a device
-                putDetails(ClientSockets[Index], requestDetails, "OF");
-            }
-            else if (action == "PUT/RB") {
-                // Client wants to replace a light's bulb
-                putDetails(ClientSockets[Index], requestDetails, "RB");
-            }
-            else if (action == "PUT/ST") {
-                // Client wants to set a new desired temperature for a thermostat
-                putDetails(ClientSockets[Index], requestDetails, "ST");
-            }
-            else if (action == "PUT/EM") {
-                // Client wants to empty a camera's memory
-                putDetails(ClientSockets[Index], requestDetails, "EM");
-            }
-            else if (action == "Out") {
-                // Try to sign out the user
-                signOut(ClientSockets[Index], requestDetails);
+            else if (action == "DELETE") {
+                // Check if request has to do with user
+                std::string type = requestDetails.substr(0, requestDetails.find("/"));
+                requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+                // Check if the type is user (trying to logout)
+                if (type == "USER")
+                {
+                    signOut(ClientSockets[Index], requestDetails);
+                }
             }
             else if (action == "End") {
                 // Stop the connection on the server side 

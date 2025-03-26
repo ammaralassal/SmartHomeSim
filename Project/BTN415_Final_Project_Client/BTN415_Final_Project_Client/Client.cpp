@@ -52,8 +52,8 @@ bool getDetails(const std::string& deviceType, const std::string& requestType, S
     // Flag to indicate if request succedded (assume failure)
     bool succeeded = false;
 
-    // Make a 'GET' request to see if the light is on
-    std::string requestString = "GET/" + requestType + " " + username + " " + deviceType + " " + deviceNum;
+    // Make a 'GET' request to see if the device is on
+    std::string requestString = "GET/" + deviceType + "/" + requestType + "/" + username + "/" + deviceNum;
 
     // Send request to server
     send(ClientSocket, requestString.c_str(), requestString.length(), 0);
@@ -99,15 +99,15 @@ bool putDetails(const std::string& deviceType, const std::string& requestType, S
     // Flag to indicate if request succedded (assume failure)
     bool succeeded = false;
 
-    // Make a 'GET' request to see if the light is on
-    std::string requestString = "PUT/" + requestType + " " + username + " " + deviceType + " " + deviceNum;
+    // Make a 'GET' request to see if the device is on
+    std::string requestString = "PUT/" + deviceType + "/" + requestType + "/" + username + "/"  + deviceNum;
 
     if (requestType == "ST")
     {
         // User wants to set a new temperature, prompt for new temperature
         std::cout << "\nWhat temperature would you like to set the thermostat for? Please note, your temperature must be a whole number between 2 and 35 degrees C.\n";
         // Collect the user's choice
-        requestString += " " + getMenuChoice(2, 35);
+        requestString += "/" + getMenuChoice(2, 35);
     }
 
     // Send request to server
@@ -153,13 +153,13 @@ bool login(SOCKET& clientSocket, std::string& username) {
     if (username == "")
     {
         // User is not currently logged in, a log-in attempt can be made, store the request into a string
-        std::string requestString = "POST/IN ";
+        std::string requestString = "POST/USER/";
         std::string inputUsername, inputPassword;
 
         // Collect the username
         std::cout << "Username: ";
         std::cin >> inputUsername;
-        requestString += inputUsername + " ";
+        requestString += inputUsername + "/";
 
         // Collect the password
         std::cout << "Password: ";
@@ -392,8 +392,8 @@ bool lights(SOCKET& ClientSocket, std::string& username)
     // Flag to indicate if light request succedded (assume failure)
     bool succeeded = false;
 
-    // Make a 'GET' request for the light information
-    std::string requestString = "GET/L " + username;
+    // Make a 'GET' request for the light information (device number is 0)
+    std::string requestString = "GET/L/AL/" + username + "/0";
 
     // Send request to server
     send(ClientSocket, requestString.c_str(), requestString.length(), 0);
@@ -467,7 +467,7 @@ bool lights(SOCKET& ClientSocket, std::string& username)
     else
     {
         // Request failed, inform user of why
-        std::cout << "\nThe request for the light information failed." << details << std::endl << std::endl;
+        std::cout << "\nThe request for the light information failed. " << details << std::endl << std::endl;
     }
 
     return succeeded;
@@ -484,8 +484,8 @@ bool thermostats(SOCKET& ClientSocket, std::string& username)
     // Flag to indicate if thermostat request succedded (assume failure)
     bool succeeded = false;
 
-    // Make a 'GET' request for the thermostat information
-    std::string requestString = "GET/T " + username;
+    // Make a 'GET' request for the thermostat information device number is 0
+    std::string requestString = "GET/T/AL/" + username + "/0";
 
     // Send request to server
     send(ClientSocket, requestString.c_str(), requestString.length(), 0);
@@ -559,7 +559,7 @@ bool thermostats(SOCKET& ClientSocket, std::string& username)
     else
     {
         // Request failed, inform user of why
-        std::cout << "\nThe request for the thermostat information failed." << details << std::endl << std::endl;
+        std::cout << "\nThe request for the thermostat information failed. " << details << std::endl << std::endl;
     }
 
     return succeeded;
@@ -576,8 +576,8 @@ bool cameras(SOCKET& ClientSocket, std::string& username)
     // Flag to indicate if camera request succedded (assume failure)
     bool succeeded = false;
 
-    // Make a 'GET' request for the camera information
-    std::string requestString = "GET/C " + username;
+    // Make a 'GET' request for the camera information (device number is 0)
+    std::string requestString = "GET/C/AL/" + username + "/0";
 
     // Send request to server
     send(ClientSocket, requestString.c_str(), requestString.length(), 0);
@@ -651,7 +651,7 @@ bool cameras(SOCKET& ClientSocket, std::string& username)
     else
     {
         // Request failed, inform user of why
-        std::cout << "\nThe request for the camera information failed." << details << std::endl << std::endl;
+        std::cout << "\nThe request for the camera information failed. " << details << std::endl << std::endl;
     }
 
     return succeeded;
@@ -676,7 +676,7 @@ bool logout(SOCKET& ClientSocket, std::string& username)
     else
     {
         // User is currently logged in, a log-out attempt can be made, store the request into a string
-        std::string requestString = "Out " + username;
+        std::string requestString = "DELETE/USER/" + username;
 
         // Send choice to server
         send(ClientSocket, requestString.c_str(), requestString.length(), 0);
