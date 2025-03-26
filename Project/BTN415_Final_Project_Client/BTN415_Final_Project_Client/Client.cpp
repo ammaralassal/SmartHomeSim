@@ -255,6 +255,9 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
         }
     }
 
+    // Release the lock on the light
+    putDetails("L", "UL", ClientSocket, username, lightNum);
+
     // Return to main menu
     std::cout << "\nReturning to Lights menu...\n\n";
 }
@@ -316,6 +319,9 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
         }
     }
 
+    // Release the lock on the thermostat
+    putDetails("T", "UL", ClientSocket, username, thermostatNum);
+
     // Return to main menu
     std::cout << "\nReturning to Thermostat menu...\n\n";
 }
@@ -335,7 +341,7 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
     while (choice != "0")
     {
         // Display options
-        std::cout << "Security camera " << cameraNum << " was selected, what would you like to do?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if memory is full\n5. Empty memory\n6. Check location\n7. Check if motion activated\n8.Get full status report\n";
+        std::cout << "Security camera " << cameraNum << " was selected, what would you like to do?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if memory is full\n5. Empty memory\n6. Check location\n7. Check if motion activated\n8. Get full status report\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Cameras Menu.\n";
         // Collect the user's choice
@@ -376,6 +382,9 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
             break;
         }
     }
+
+    // Release the lock on the camera
+    putDetails("C", "UL", ClientSocket, username, cameraNum);
 
     // Return to main menu
     std::cout << "\nReturning to Cameras menu...\n\n";
@@ -453,8 +462,17 @@ bool lights(SOCKET& ClientSocket, std::string& username)
 
             if (choice != "0")
             {
-                // A light has been selected, handle requests pertaining to that light
-                light(ClientSocket, username, choice);
+                // Try to put a lock on the light
+                if (putDetails("L", "LK", ClientSocket, username, choice))
+                {
+                    // A light has successfully been selected, handle requests pertaining to that light
+                    light(ClientSocket, username, choice);
+                }
+                else
+                {
+                    // Could not lock device, clear the choice so the user can try again
+                    choice = "";
+                }
             }
             else
             {
@@ -545,8 +563,17 @@ bool thermostats(SOCKET& ClientSocket, std::string& username)
 
             if (choice != "0")
             {
-                // A thermostat has been selected, handle requests pertaining to that thermostat
-                thermostat(ClientSocket, username, choice);
+                // Try to put a lock on the thermostat
+                if (putDetails("T", "LK", ClientSocket, username, choice))
+                {
+                    // A thermostat has successfully been selected, handle requests pertaining to that thermostat
+                    thermostat(ClientSocket, username, choice);
+                }
+                else
+                {
+                    // Could not lock device, clear the choice so the user can try again
+                    choice = "";
+                }
             }
             else
             {
@@ -637,8 +664,17 @@ bool cameras(SOCKET& ClientSocket, std::string& username)
 
             if (choice != "0")
             {
-                // A camera has been selected, handle requests pertaining to that camera
-                camera(ClientSocket, username, choice);
+                // Try to put a lock on the camera
+                if (putDetails("C", "LK", ClientSocket, username, choice))
+                {
+                    // A camera has successfully been selected, handle requests pertaining to that camera
+                    camera(ClientSocket, username, choice);
+                }
+                else
+                {
+                    // Could not lock device, clear the choice so the user can try again
+                    choice = "";
+                }
             }
             else
             {

@@ -1,7 +1,7 @@
 ﻿  Server.cpp
-C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(36,43): warning C4838: conversion from 'int' to 'SOCKET' requires a narrowing conversion
-C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(123,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(163,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(473,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(693,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(37,43): warning C4838: conversion from 'int' to 'SOCKET' requires a narrowing conversion
+C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(127,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(167,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(471,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\BTN415_Final_Project_Server\Server.cpp(751,55): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
   BTN415_Final_Project_Server.vcxproj -> C:\Users\bsmap\Desktop\My Things\School\Collage\Semester 4\BTN 415\Project\BTN415_Final_Project_Server\x64\Debug\BTN415_Final_Project_Server.exe

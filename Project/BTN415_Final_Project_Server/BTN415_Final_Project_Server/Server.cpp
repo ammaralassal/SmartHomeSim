@@ -6,6 +6,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <memory>
 
 #include "SmartDevices.h"
 #include "Lights.h"
@@ -13,12 +14,12 @@
 #include "Thermostat.h"
 #pragma comment(lib, "Ws2_32.lib")
 
-// A mutex to lock the lights array so that there are no race conditions
-std::mutex mu_lights;
-// A mutex to lock the cameras array so that there are no race conditions
-std::mutex mu_cameras;
-// A mutex to lock the thermostats array so that there are no race conditions
-std::mutex mu_thermostats;
+// An array of smart pointers to mutexes (so that they work with a vector) to lock the lights devices so that there are no race conditions
+std::vector<std::unique_ptr<std::mutex>> mu_lights;
+// An array of smart pointers to mutexes (so that they work with a vector) to lock the cameras devices so that there are no race conditions
+std::vector<std::unique_ptr<std::mutex>> mu_cameras;
+// An array of smart pointers to mutexes (so that they work with a vector) to lock the thermostats devices array so that there are no race conditions
+std::vector<std::unique_ptr<std::mutex>> mu_thermostats;
 // A mutex to lock the logged in users collection so that there are no race conditions
 std::mutex mu_loggedInUsers;
 // Vector to store the smart lights in the home (shared resource across threads)
@@ -41,10 +42,13 @@ void load()
 {
     // Just load one light for now for testing purposes
     lights.push_back(seneca::Lights("Bedroom"));
+    mu_lights.push_back(std::make_unique<std::mutex>());
     // Just load one camera for now for testing purposes
     cameras.push_back(seneca::SecurityCameras("Kitchen"));
+    mu_cameras.push_back(std::make_unique<std::mutex>());
     // Just load one thermostat for now for testing purposes
     thermostats.push_back(seneca::Thermostat("Living-Room", 18, 21, true));
+    mu_thermostats.push_back(std::make_unique<std::mutex>());
 }
 
 /// <summary>
@@ -204,9 +208,6 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
         // Take control of the approperiate lock
         if (deviceType == "L")
         {
-            // Device is a Light
-            mu_lights.lock();
-
             if (requestType == "AL")
             {
                 // Request is for all lights
@@ -283,14 +284,11 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
                 // No light information could be delivered, the light does not exist
                 response = "Failed. That is not recognised as a valid light.";
             }
-
-            // Release control of the lock
-            mu_lights.unlock();
         }
         else if (deviceType == "C")
         {
             // Device is a Camera
-            mu_cameras.lock();
+            //mu_cameras.lock();
 
             if (requestType == "AL")
             {
@@ -386,12 +384,12 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
 
             // Release control of the lock
-            mu_cameras.unlock();
+            //mu_cameras.unlock();
         }
         else if (deviceType == "T")
         {
             // Device is a Thermostat
-            mu_thermostats.lock();
+            //mu_thermostats.lock();
 
             if (requestType == "AL")
             {
@@ -465,7 +463,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
 
             // Release control of the lock
-            mu_thermostats.unlock();
+            //mu_thermostats.unlock();
         }
     }
 
@@ -511,12 +509,10 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
         requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
 
-        // Take control of the approperiate lock
+        // Deal with correct device type
         if (deviceType == "L")
         {
             // Device is a Light
-            mu_lights.lock();
-
             if (lights.size() > 0 && deviceNumber < lights.size())
             {
                 // Valid light, try to fulfil request
@@ -556,6 +552,28 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
                     response += "Succeeded. The light bulb has been replaced.";
                     lights[deviceNumber].replaceBulb();
                 }
+                else if (requestType == "LK")
+                {
+                    // Attempt to lock the device
+                    if (mu_lights[deviceNumber]->try_lock())
+                    {
+                        // This light was locked and the user can now examine it or make modifications to it
+                        response += "Succeeded. Loading Light " + std::to_string(deviceNumber + 1) + ".";
+                        succeeded = true;
+                    }
+                    else
+                    {
+                        // The light is busy
+                        response += "Failed. This light is already being examined by another user, try again later.";
+                    }
+                }
+                else if (requestType == "UL")
+                {
+                    // Unlock the light
+                    mu_lights[deviceNumber]->unlock();
+                    response += "Succeeded. Light " + std::to_string(deviceNumber + 1) + " has been released.";
+                    succeeded = true;
+                }
             }
             else
             {
@@ -564,13 +582,11 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
 
             // Release control of the lock
-            mu_lights.unlock();
+            //mu_lights.unlock();
         }
         else if (deviceType == "C")
         {
             // Device is a Camera
-            mu_cameras.lock();
-
             if (cameras.size() > 0 && deviceNumber < cameras.size())
             {
                 // Valid camera, try to fulfil request
@@ -610,6 +626,28 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
                     response += "Succeeded. The camera's memory has been emptied.";
                     succeeded = cameras[deviceNumber].wipeMemory();
                 }
+                else if (requestType == "LK")
+                {
+                    // Attempt to lock the device
+                    if (mu_cameras[deviceNumber]->try_lock())
+                    {
+                        // This camera was locked and the user can now examine it or make modifications to it
+                        response += "Succeeded. Loading Camera " + std::to_string(deviceNumber + 1) + ".";
+                        succeeded = true;
+                    }
+                    else
+                    {
+                        // The camera is busy
+                        response += "Failed. This camera is already being examined by another user, try again later.";
+                    }
+                }
+                else if (requestType == "UL")
+                {
+                    // Unlock the camera
+                    mu_cameras[deviceNumber]->unlock();
+                    response += "Succeeded. Camera " + std::to_string(deviceNumber + 1) + " has been released.";
+                    succeeded = true;
+                }
             }
             else
             {
@@ -618,13 +656,11 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
 
             // Release control of the lock
-            mu_cameras.unlock();
+            //mu_cameras.unlock();
         }
         else if (deviceType == "T")
         {
             // Device is a Thermostat
-            mu_thermostats.lock();
-
             if (thermostats.size() > 0 && deviceNumber < thermostats.size())
             {
                 // Valid thermostat, try to fulfil request
@@ -677,6 +713,28 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
                         response = "Failed. The thermostat was not able to be set.";
                     }
                 }
+                else if (requestType == "LK")
+                {
+                    // Attempt to lock the device
+                    if (mu_thermostats[deviceNumber]->try_lock())
+                    {
+                        // This thermostat was locked and the user can now examine it or make modifications to it
+                        response += "Succeeded. Loading Thermostat " + std::to_string(deviceNumber + 1) + ".";
+                        succeeded = true;
+                    }
+                    else
+                    {
+                        // The thermostat is busy
+                        response += "Failed. This thermostat is already being examined by another user, try again later.";
+                    }
+                }
+                else if (requestType == "UL")
+                {
+                    // Unlock the thermostat
+                    mu_thermostats[deviceNumber]->unlock();
+                    response += "Succeeded. Thermostat " + std::to_string(deviceNumber + 1) + " has been released.";
+                    succeeded = true;
+                }
             }
             else
             {
@@ -685,7 +743,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
 
             // Release control of the lock
-            mu_thermostats.unlock();
+            //mu_thermostats.unlock();
         }
     }
 
