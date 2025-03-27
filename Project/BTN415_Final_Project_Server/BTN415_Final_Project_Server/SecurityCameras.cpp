@@ -2,13 +2,8 @@
 #include <string>
 
 namespace seneca {
-    SecurityCameras::SecurityCameras(const std::string& location, const bool& memoryIsFull, const bool& isMotionActivated, const bool& on) : SmartDevices(location, on)
-    {
-        // Initialize the security camera
-        m_memoryIsFull = memoryIsFull;
-        m_isMotionActivated = isMotionActivated;
-
-    }
+    SecurityCameras::SecurityCameras(const std::string& location, const bool& memoryIsFull, const bool& isMotionActivated, const bool& on, const std::string& ip) : SmartDevices(location, on, ip), 
+        m_memoryIsFull(memoryIsFull), m_isMotionActivated(isMotionActivated) {}
 
     bool SecurityCameras::wipeMemory()
     {

@@ -689,12 +689,12 @@ bool logout(SOCKET& ClientSocket, std::string& username)
 
         // Break up the response message for interpretation
         std::string result = serverResponse.substr(0, serverResponse.find("."));
-        std::string explaination = serverResponse.substr(serverResponse.find(".") + 1);
+        std::string explanation = serverResponse.substr(serverResponse.find(".") + 1);
 
         if (result == "Succeeded")
         {
             // Logout succeeded, inform user
-            std::cout << "\nCongradulations, you have been logged out!" << explaination << std::endl << std::endl;
+            std::cout << "\nYou have been logged out" << explanation << std::endl << std::endl;
             succeeded = true;
             username = "";
 
@@ -707,7 +707,7 @@ bool logout(SOCKET& ClientSocket, std::string& username)
         else
         {
             // Logout failed, inform user of why
-            std::cout << "\nThe logout failed. Try again later." << explaination << std::endl << std::endl;
+            std::cout << "\nThe logout failed. Try again later." << explanation << std::endl << std::endl;
         }
     }
 

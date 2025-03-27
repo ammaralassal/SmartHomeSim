@@ -3,12 +3,8 @@
 
 namespace seneca
 {
-    Lights::Lights(const std::string& location, const bool& isBurnedOut, const bool& on) : SmartDevices(location, on)
-    {
-        // Initialize light
-        m_burnedOut = isBurnedOut;
-    }
-
+	Lights::Lights(const std::string& location, const bool& isBurnedOut, const bool& on, const std::string& ip)
+		: SmartDevices(location, on, ip), m_burnedOut(isBurnedOut) {}
 
     std::string Lights::getStatus()
     {

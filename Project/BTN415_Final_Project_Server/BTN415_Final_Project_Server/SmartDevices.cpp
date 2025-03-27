@@ -2,20 +2,12 @@
 
 namespace seneca
 {
-	SmartDevices::SmartDevices(const std::string& location, const bool& on)
-	{
-		// Initialize the on attribute
-		m_location = location;
-		m_on = on;
-	}
+	SmartDevices::SmartDevices(const std::string& location, const bool& on, const std::string& ip)
+		: m_location(location), m_on(on), m_ipAddress(ip) {}
 
 	bool SmartDevices::turnOn()
 	{
-		if (m_on)
-		{
-			// Already on, no action required
-			return false;
-		}
+		if (m_on) return false; // Already on, no action required
 
 		// Turn on
 		m_on = true;
@@ -24,25 +16,17 @@ namespace seneca
 
 	bool SmartDevices::turnOff()
 	{
-		if (!m_on)
-		{
-			// Already off, no action required
-			return false;
-		}
+		if (!m_on) return false; // Already off, no action required
 
 		// Turn off
 		m_on = false;
 		return true;
 	}
 
-	bool SmartDevices::getOn()
-	{
-		return m_on;
-	}
+	bool SmartDevices::getOn() { return m_on; }
 
-	std::string SmartDevices::getLocation()
-	{
-		// Return the location of the device
-		return m_location;
-	}
+
+	std::string SmartDevices::getLocation() const { return m_location; } // Return the location of the device
+
+	std::string SmartDevices::getIPAddress() const { return m_ipAddress; } //Return the IP Address of the device
 }

@@ -27,7 +27,7 @@ namespace seneca
         /// <param name="memoryIsFull">True if the camera's memory is full and no further recording is possible</param>
         /// <param name="m_isMotionActivated">True if the camera type is 'motion activated'</param>
         /// <param name="on">True if the camera is currently on</param>
-        SecurityCameras(const std::string& location = "", const bool& memoryIsFull = false, const bool& isMotionActivated = false, const bool& on = false);
+        SecurityCameras(const std::string& location = "", const bool& memoryIsFull = false, const bool& isMotionActivated = false, const bool& on = false, const std::string& ip = "");
         
         /// <summary>
         /// Wipes the camera's memory so that the memory is no longer full, regardless of what it was at before

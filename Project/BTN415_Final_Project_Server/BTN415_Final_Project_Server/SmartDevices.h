@@ -20,7 +20,10 @@ namespace seneca {
 		/// When true, the device is on; when false, the device is off
 		/// </summary>
 		bool m_on;
-
+		/// <summary>
+		/// Stores an assigned IP for routing purposes
+		/// </summary>
+		std::string m_ipAddress;
 
 	public:
 		/// <summary>
@@ -28,7 +31,7 @@ namespace seneca {
 		/// </summary>
 		/// <param name="on">A value to initialize whether the device starts on or off; defaults to off</param>
 		/// <param name="location">A value to initialize the location of the device</param>
-		SmartDevices(const std::string& location, const bool& on = false);
+		SmartDevices(const std::string& location, const bool& on = false, const std::string& ip = "");
 
 		/// <summary>
 		/// Turn the device on if it was off
@@ -58,7 +61,7 @@ namespace seneca {
 		/// Get the location of the device
 		/// </summary>
 		/// <returns>A string detailing the location of the device on the property</returns>
-		std::string getLocation();
+		std::string getLocation() const;
 
 		/// <summary>
 		/// A pure virtual function to be implemented by child classes
@@ -67,6 +70,11 @@ namespace seneca {
 		/// </summary>
 		/// <returns>The status of the object as a human readable string</returns>
 		virtual std::string getStatus() = 0;
+		/// <summary>
+		/// Gets the IP Address of the device
+		/// </summary>
+		/// <returns> The IP Address of the device</returns>
+		std::string getIPAddress() const;
 	};
 }
 

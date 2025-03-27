@@ -3,12 +3,8 @@
 
 namespace seneca
 {
-	Thermostat::Thermostat(const std::string& location, const int& houseTemp, const int& desiredTemp, const bool& on) : SmartDevices(location, on)
-	{
-		// Initialize temperatures
-		m_currentTemperature = houseTemp;
-		m_desiredTemperature = desiredTemp;
-	}
+	Thermostat::Thermostat(const std::string& location, const int& houseTemp, const int& desiredTemp, const bool& on, const std::string& ip) : SmartDevices(location, on, ip), m_currentTemperature(houseTemp), 
+		m_desiredTemperature(desiredTemp) {}
 
 	int Thermostat::getCurrentTemperature()
 	{
