@@ -22,7 +22,7 @@ namespace seneca
         /// <param name="location">The location of the light in the house</param>
         /// <param name="isBurnedOut">True if the bulb is burned out; false otherwise</param>
         /// <param name="on">True if the light is on, false otherwise</param>
-        Lights(const std::string& location, const bool& isBurnedOut = false, const bool& on = false, const std::string& ip = "");
+        Lights(const std::string& location = "", const bool& isBurnedOut = false, const bool& on = false, const std::string& ip = "");
 
         /// <summary>
         /// Get the status of the light

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <winsock2.h>
 #include <string>
+#include <vector>
 #pragma comment(lib, "Ws2_32.lib")
 
 /// <summary>
@@ -45,15 +46,15 @@ std::string getMenuChoice(const int& min, const int& max)
 /// <param name="requestType">The type of information being requested</param>
 /// <param name="ClientSocket">The socket</param>
 /// <param name="username">The user making the request</param>
-/// <param name="deviceNum">The device number</param>
+/// <param name="ip">The ip address of the device</param>
 /// <returns>True if request for information could be completed; false otherwise</returns>
-bool getDetails(const std::string& deviceType, const std::string& requestType, SOCKET& ClientSocket, const std::string& username, const std::string& deviceNum)
+bool getDetails(const std::string& deviceType, const std::string& requestType, SOCKET& ClientSocket, const std::string& username, const std::string& ip)
 {
     // Flag to indicate if request succedded (assume failure)
     bool succeeded = false;
 
     // Make a 'GET' request to see if the device is on
-    std::string requestString = "GET/" + deviceType + "/" + requestType + "/" + username + "/" + deviceNum;
+    std::string requestString = "GET/" + deviceType + "/" + requestType + "/" + username + "/" + ip;
 
     // Send request to server
     send(ClientSocket, requestString.c_str(), requestString.length(), 0);
@@ -92,15 +93,15 @@ bool getDetails(const std::string& deviceType, const std::string& requestType, S
 /// <param name="requestType">The type of request being made</param>
 /// <param name="ClientSocket">The socket</param>
 /// <param name="username">The user making the request</param>
-/// <param name="deviceNum">The device number</param>
+/// <param name="ip">The ip address of the device</param>
 /// <returns>True if device was successfully updated; false otherwise</returns>
-bool putDetails(const std::string& deviceType, const std::string& requestType, SOCKET& ClientSocket, const std::string& username, const std::string& deviceNum)
+bool putDetails(const std::string& deviceType, const std::string& requestType, SOCKET& ClientSocket, const std::string& username, const std::string& ip)
 {
     // Flag to indicate if request succedded (assume failure)
     bool succeeded = false;
 
     // Make a 'GET' request to see if the device is on
-    std::string requestString = "PUT/" + deviceType + "/" + requestType + "/" + username + "/"  + deviceNum;
+    std::string requestString = "PUT/" + deviceType + "/" + requestType + "/" + username + "/"  + ip;
 
     if (requestType == "ST")
     {
@@ -207,8 +208,8 @@ bool login(SOCKET& clientSocket, std::string& username) {
 /// </summary>
 /// <param name="ClientSocket">The socket</param>
 /// <param name="username">The user trying to preform the actions</param>
-/// <param name="lightNum">The light that was seclected, stored as a string</param>
-void light(SOCKET& ClientSocket, const std::string& username, const std::string& lightNum)
+/// <param name="">The light that was seclected', stored as a string's ip address</param>
+void light(SOCKET& ClientSocket, const std::string& username, const std::string& ip)
 {
     // String for storing the user's choice
     std::string choice = "";
@@ -217,7 +218,7 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
     while (choice != "0")
     {
         // Display options
-        std::cout << "Light " << lightNum << " was selected, what would you like to do?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if bulb has burned out\n5. Replace bulb\n6. Check location\n7. Get full status report\n";
+        std::cout << "What would you like to do with this light?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if bulb has burned out\n5. Replace bulb\n6. Check location\n7. Get full status report\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Lights Menu.\n";
         // Collect the user's choice
@@ -226,36 +227,36 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
         switch (std::stoi(choice)) {
         case 1:
             // Check if the light is on
-            getDetails ("L", "ON", ClientSocket, username, lightNum);
+            getDetails ("L", "ON", ClientSocket, username, ip);
             break;
         case 2:
             // Try to turn the light on
-            putDetails("L", "ON", ClientSocket, username, lightNum);
+            putDetails("L", "ON", ClientSocket, username, ip);
             break;
         case 3:
             // Try to turn the light off
-            putDetails("L", "OF", ClientSocket, username, lightNum);
+            putDetails("L", "OF", ClientSocket, username, ip);
             break;
         case 4:
             // Check if the bulb has burned out
-            getDetails("L", "BO", ClientSocket, username, lightNum);
+            getDetails("L", "BO", ClientSocket, username, ip);
             break;
         case 5:
             // Try to replace the bulb
-            putDetails("L", "RB", ClientSocket, username, lightNum);
+            putDetails("L", "RB", ClientSocket, username, ip);
             break;
         case 6:
             // Check if the location
-            getDetails("L", "LO", ClientSocket, username, lightNum);
+            getDetails("L", "LO", ClientSocket, username, ip);
             break;
         case 7:
             // Get a full status report on the bulb
-            getDetails("L", "ST", ClientSocket, username, lightNum);
+            getDetails("L", "ST", ClientSocket, username, ip);
             break;
         }
     }
     // Release the lock on the light
-    putDetails("L", "UL", ClientSocket, username, lightNum);
+    putDetails("L", "UL", ClientSocket, username, ip);
 
     // Return to main menu
     std::cout << "\nReturning to Lights menu...\n\n";
@@ -266,8 +267,8 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
 /// </summary>
 /// <param name="ClientSocket">The socket</param>
 /// <param name="username">The user trying to preform the actions</param>
-/// <param name="thermostatNum">The thermostat that was seclected, stored as a string</param>
-void thermostat(SOCKET& ClientSocket, const std::string& username, const std::string& thermostatNum)
+/// <param name="ip">The thermostat that was seclected's ip address</param>
+void thermostat(SOCKET& ClientSocket, const std::string& username, const std::string& ip)
 {
     // String for storing the user's choice
     std::string choice = "";
@@ -276,7 +277,7 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
     while (choice != "0")
     {
         // Display options
-        std::cout << "Thermostat " << thermostatNum << " was selected, what would you like to do?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check the current temperature\n5. Check the set temperature\n6. Set a new temperature\n7. Check location\n8. Get full status report\n";
+        std::cout << "What would you like to do with this thermostat?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check the current temperature\n5. Check the set temperature\n6. Set a new temperature\n7. Check location\n8. Get full status report\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Thermostat Menu.\n";
         // Collect the user's choice
@@ -285,40 +286,40 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
         switch (std::stoi(choice)) {
         case 1:
             // Check if the thermostat is on
-            getDetails("T", "ON", ClientSocket, username, thermostatNum);
+            getDetails("T", "ON", ClientSocket, username, ip);
             break;
         case 2:
             // Try to turn the thermostat on
-            putDetails("T", "ON", ClientSocket, username, thermostatNum);
+            putDetails("T", "ON", ClientSocket, username, ip);
             break;
         case 3:
             // Try to turn the thermostat off
-            putDetails("T", "OF", ClientSocket, username, thermostatNum);
+            putDetails("T", "OF", ClientSocket, username, ip);
             break;
         case 4:
             // Check the current temperature
-            getDetails("T", "CT", ClientSocket, username, thermostatNum);
+            getDetails("T", "CT", ClientSocket, username, ip);
             break;
         case 5:
             // Check the desired temperature
-            getDetails("T", "DT", ClientSocket, username, thermostatNum);
+            getDetails("T", "DT", ClientSocket, username, ip);
             break;
         case 6:
             // Change the desired temperature
-            putDetails("T", "ST", ClientSocket, username, thermostatNum);
+            putDetails("T", "ST", ClientSocket, username, ip);
             break;
         case 7:
             // Check if the location
-            getDetails("T", "LO", ClientSocket, username, thermostatNum);
+            getDetails("T", "LO", ClientSocket, username, ip);
             break;
         case 8:
             // Get a full status report on the thermostat
-            getDetails("T", "ST", ClientSocket, username, thermostatNum);
+            getDetails("T", "ST", ClientSocket, username, ip);
             break;
         }
     }
     // Release the lock on the thermostat
-    putDetails("T", "UL", ClientSocket, username, thermostatNum);
+    putDetails("T", "UL", ClientSocket, username, ip);
 
     // Return to main menu
     std::cout << "\nReturning to Thermostat menu...\n\n";
@@ -329,8 +330,8 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
 /// </summary>
 /// <param name="ClientSocket">The socket</param>
 /// <param name="username">The user preforming the actions</param>
-/// <param name="cameraNum">The camera that was selcted, stored as a string</param>
-void camera(SOCKET& ClientSocket, const std::string& username, const std::string& cameraNum)
+/// <param name="ip">The camera that was selcted', stored as a string's ip address</param>
+void camera(SOCKET& ClientSocket, const std::string& username, const std::string& ip)
 {
     // String for storing the user's choice
     std::string choice = "";
@@ -339,7 +340,7 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
     while (choice != "0")
     {
         // Display options
-        std::cout << "Security camera " << cameraNum << " was selected, what would you like to do?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if memory is full\n5. Empty memory\n6. Check location\n7. Check if motion activated\n8. Get full status report\n";
+        std::cout << "What would you like to do with this security camera?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if memory is full\n5. Empty memory\n6. Check location\n7. Check if motion activated\n8. Get full status report\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Cameras Menu.\n";
         // Collect the user's choice
@@ -348,40 +349,40 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
         switch (std::stoi(choice)) {
         case 1:
             // Check if the camera is on
-            getDetails("C", "ON", ClientSocket, username, cameraNum);
+            getDetails("C", "ON", ClientSocket, username, ip);
             break;
         case 2:
             // Try to turn the camera on
-            putDetails("C", "ON", ClientSocket, username, cameraNum);
+            putDetails("C", "ON", ClientSocket, username, ip);
             break;
         case 3:
             // Try to turn the camera off
-            putDetails("C", "OF", ClientSocket, username, cameraNum);
+            putDetails("C", "OF", ClientSocket, username, ip);
             break;
         case 4:
             // Check the memory is full
-            getDetails("C", "MF", ClientSocket, username, cameraNum);
+            getDetails("C", "MF", ClientSocket, username, ip);
             break;
         case 5:
             // Try to empty the memory
-            putDetails("C", "EM", ClientSocket, username, cameraNum);
+            putDetails("C", "WM", ClientSocket, username, ip);
             break;
         case 6:
             // Check the location
-            getDetails("C", "LO", ClientSocket, username, cameraNum);
+            getDetails("C", "LO", ClientSocket, username, ip);
             break;
         case 7:
             // Check if the camera is motion activated
-            getDetails("C", "MA", ClientSocket, username, cameraNum);
+            getDetails("C", "MA", ClientSocket, username, ip);
             break; 
         case 8:
             // Get a full status report on the camera
-            getDetails("C", "ST", ClientSocket, username, cameraNum);
+            getDetails("C", "ST", ClientSocket, username, ip);
             break;
         }
     }
     // Release the lock on the camera
-    putDetails("C", "UL", ClientSocket, username, cameraNum);
+    putDetails("C", "UL", ClientSocket, username, ip);
 
     // Return to main menu
     std::cout << "\nReturning to Cameras menu...\n\n";
@@ -398,7 +399,7 @@ bool lights(SOCKET& ClientSocket, std::string& username)
     // Flag to indicate if light request succedded (assume failure)
     bool succeeded = false;
 
-    // Make a 'GET' request for the light information (device number is 0)
+    // Make a 'GET' request for the light information (ip address is 0 as a placeholder)
     std::string requestString = "GET/L/AL/" + username + "/0";
 
     // Send request to server
@@ -423,6 +424,9 @@ bool lights(SOCKET& ClientSocket, std::string& username)
         std::string lightsMenu = "Lights:\n";
         int count = 0;
 
+        // Store the ip addresses of the devices
+        std::vector<std::string> ipAddresses;
+
         // Get all the lights from the details
         while (!(details == " " || details == ""))
         {
@@ -433,11 +437,16 @@ bool lights(SOCKET& ClientSocket, std::string& username)
             int indexOfSpace = details.find(" ");
             lightsMenu += details.substr(0, indexOfSpace);
 
-            // Remove the light from the string
+            // Remove the light location from the string
             details = details.substr(indexOfSpace + 1);
 
             // Add a newline character for formatting
             lightsMenu += "\n";
+
+            // Record the ip of the light and remove it from the string
+            indexOfSpace = details.find(" ");
+            ipAddresses.push_back(details.substr(0, indexOfSpace));
+            details = details.substr(indexOfSpace + 1);
         }
 
         // Menu ending
@@ -460,10 +469,10 @@ bool lights(SOCKET& ClientSocket, std::string& username)
             if (choice != "0")
             {
                 // Try to put a lock on the light
-                if (putDetails("L", "LK", ClientSocket, username, choice))
+                if (putDetails("L", "LK", ClientSocket, username, ipAddresses[std::stoi(choice) - 1]))
                 {
                     // A light has successfully been selected, handle requests pertaining to that light
-                    light(ClientSocket, username, choice);
+                    light(ClientSocket, username, ipAddresses[std::stoi(choice) - 1]);
                 }
                 else
                 {
@@ -524,6 +533,9 @@ bool thermostats(SOCKET& ClientSocket, std::string& username)
         std::string menu = "Thermostats:\n";
         int count = 0;
 
+        // Store the ip addresses of the devices
+        std::vector<std::string> ipAddresses;
+
         // Get all the thermostats from the details
         while (!(details == " " || details == ""))
         {
@@ -534,11 +546,16 @@ bool thermostats(SOCKET& ClientSocket, std::string& username)
             int indexOfSpace = details.find(" ");
             menu += details.substr(0, indexOfSpace);
 
-            // Remove the thermostat from the string
+            // Remove the thermostat location from the string
             details = details.substr(indexOfSpace + 1);
 
             // Add a newline character for formatting
             menu += "\n";
+
+            // Record the ip of the thermostat and remove it from the string
+            indexOfSpace = details.find(" ");
+            ipAddresses.push_back(details.substr(0, indexOfSpace));
+            details = details.substr(indexOfSpace + 1);
         }
 
         // Menu ending
@@ -561,10 +578,10 @@ bool thermostats(SOCKET& ClientSocket, std::string& username)
             if (choice != "0")
             {
                 // Try to put a lock on the thermostat
-                if (putDetails("T", "LK", ClientSocket, username, choice))
+                if (putDetails("T", "LK", ClientSocket, username, ipAddresses[std::stoi(choice) - 1]))
                 {
                     // A thermostat has successfully been selected, handle requests pertaining to that thermostat
-                    thermostat(ClientSocket, username, choice);
+                    thermostat(ClientSocket, username, ipAddresses[std::stoi(choice) -  1]);
                 }
                 else
                 {
@@ -625,6 +642,9 @@ bool cameras(SOCKET& ClientSocket, std::string& username)
         std::string menu = "Cameras:\n";
         int count = 0;
 
+        // Store the ip addresses of the devices
+        std::vector<std::string> ipAddresses;
+
         // Get all the cameras from the details
         while (!(details == " " || details == ""))
         {
@@ -635,11 +655,16 @@ bool cameras(SOCKET& ClientSocket, std::string& username)
             int indexOfSpace = details.find(" ");
             menu += details.substr(0, indexOfSpace);
 
-            // Remove the camera from the string
+            // Remove the camera location from the string
             details = details.substr(indexOfSpace + 1);
 
             // Add a newline character for formatting
             menu += "\n";
+
+            // Record the ip of the camera and remove it from the string
+            indexOfSpace = details.find(" ");
+            ipAddresses.push_back(details.substr(0, indexOfSpace));
+            details = details.substr(indexOfSpace + 1);
         }
 
         // Menu ending
@@ -662,10 +687,10 @@ bool cameras(SOCKET& ClientSocket, std::string& username)
             if (choice != "0")
             {
                 // Try to put a lock on the camera
-                if (putDetails("C", "LK", ClientSocket, username, choice))
+                if (putDetails("C", "LK", ClientSocket, username, ipAddresses[std::stoi(choice) - 1]))
                 {
                     // A camera has successfully been selected, handle requests pertaining to that camera
-                    camera(ClientSocket, username, choice);
+                    camera(ClientSocket, username, ipAddresses[std::stoi(choice) - 1]);
                 }
                 else
                 {
