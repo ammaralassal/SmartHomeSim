@@ -31,7 +31,7 @@ namespace seneca {
 		/// </summary>
 		/// <param name="on">A value to initialize whether the device starts on or off; defaults to off</param>
 		/// <param name="location">A value to initialize the location of the device</param>
-		SmartDevices(const std::string& location, const bool& on = false, const std::string& ip = "");
+		SmartDevices(const std::string& location = "", const bool& on = false, const std::string& ip = "");
 
 		/// <summary>
 		/// Turn the device on if it was off

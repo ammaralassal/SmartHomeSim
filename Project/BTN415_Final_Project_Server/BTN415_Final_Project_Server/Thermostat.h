@@ -25,7 +25,7 @@ namespace seneca
         /// <param name="houseTemp">The house's current temperature</param>
         /// <param name="desiredTemp">The temperature the thermostat is set to</param>
         /// <param name="on">Whether it is on or off (defaults to off)</param>
-        Thermostat(const std::string& location, const int& houseTemp, const int& desiredTemp, const bool& on = false, const std::string& ip = "");
+        Thermostat(const std::string& location = "", const int& houseTemp = 21, const int& desiredTemp = 21, const bool& on = false, const std::string& ip = "");
 
         /// <summary>
         /// Return the house's current temperature

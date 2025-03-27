@@ -10,6 +10,7 @@
 #include <bitset>
 #include <sstream>
 #include <memory>
+#include <unordered_map>
 
 #include "SmartDevices.h"
 #include "Lights.h"
@@ -28,6 +29,7 @@ struct RouteEntry {
 
 /// <summary>
 /// Static routing table entries
+/// Lights, Camera, Thermostat
 /// </summary>
 std::vector<RouteEntry> routingTable = {
     {"192.168.1.0/28", "local"},
@@ -50,20 +52,20 @@ std::mutex mu_lightsCollection;
 std::mutex mu_camerasCollection;
 // A mutex to lock the thermostats collection so that there are no race conditions
 std::mutex mu_thermostatsCollection;
-// An array of smart pointers to mutexes (so that they work with a vector) to lock the lights devices so that there are no race conditions
-std::vector<std::unique_ptr<std::mutex>> mu_lights;
-// An array of smart pointers to mutexes (so that they work with a vector) to lock the cameras devices so that there are no race conditions
-std::vector<std::unique_ptr<std::mutex>> mu_cameras;
-// An array of smart pointers to mutexes (so that they work with a vector) to lock the thermostats devices array so that there are no race conditions
-std::vector<std::unique_ptr<std::mutex>> mu_thermostats;
+// An unordered mapping of ip addresses to smart pointers to mutexes (so that they work with a vector) to lock the lights devices so that there are no race conditions
+std::unordered_map<std::string, std::unique_ptr<std::mutex>> mu_lights;
+// An unordered mapping of ip addresses to smart pointers to mutexes (so that they work with a vector) to lock the cameras devices so that there are no race conditions
+std::unordered_map<std::string, std::unique_ptr<std::mutex>> mu_cameras;
+// An unordered mapping of ip addresses to pointers to mutexes (so that they work with a vector) to lock the thermostats devices array so that there are no race conditions
+std::unordered_map<std::string, std::unique_ptr<std::mutex>> mu_thermostats;
 // A mutex to lock the logged in users collection so that there are no race conditions
 std::mutex mu_loggedInUsers;
-// Vector to store the smart lights in the home (shared resource across threads)
-std::vector<seneca::Lights> lights;
-// Vector to store the smart lights in the home (shared resource across threads)
-std::vector<seneca::SecurityCameras> cameras;
-// Vector to store the smart lights in the home (shared resource across threads)
-std::vector<seneca::Thermostat> thermostats;
+// An unordered mapping of ip addresses and smart lights in the home (shared resource across threads)
+std::unordered_map<std::string, seneca::Lights> lights;
+// An unordered mapping of ip addresses and security cameras in the home (shared resource across threads)
+std::unordered_map<std::string, seneca::SecurityCameras> cameras;
+// An unordered mapping of ip addresses and thermostats in the home (shared resource across threads)
+std::unordered_map<std::string, seneca::Thermostat> thermostats;
 // Vector of the logged in users for the server (shared resource across threads)
 std::vector<std::string> loggedInUsers;
 
@@ -127,14 +129,14 @@ bool Active_Sockets[MAX_SOCKETS + 1] = { false };
 void load()
 {
     // Just load one light for now for testing purposes
-    lights.push_back(seneca::Lights("Bedroom", false, false, "192.168.1.1"));
-    mu_lights.push_back(std::make_unique<std::mutex>());
+    lights["192.168.1.1"] = seneca::Lights("Bedroom", false, false, "192.168.1.1");
+    mu_lights["192.168.1.1"] = std::make_unique<std::mutex>();
     // Just load one camera for now for testing purposes
-    cameras.push_back(seneca::SecurityCameras("Kitchen", false, false, false, "192.168.3.1"));
-    mu_cameras.push_back(std::make_unique<std::mutex>());
+    cameras["192.168.3.1"] = seneca::SecurityCameras("Kitchen", false, false, false, "192.168.3.1");
+    mu_cameras["192.168.3.1"] = std::make_unique<std::mutex>();
     // Just load one thermostat for now for testing purposes
-    thermostats.push_back(seneca::Thermostat("Living-Room", 18, 21, true, "192.168.2.1"));
-    mu_thermostats.push_back(std::make_unique<std::mutex>());
+    thermostats["192.168.2.1"] = seneca::Thermostat("Living-Room", 18, 21, true, "192.168.2.1");
+    mu_thermostats["192.168.2.1"] = std::make_unique<std::mutex>();
 }
 
 /// <summary>
@@ -283,9 +285,9 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
         return false;
     }
 
-    // Extract device number
-    int deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find(" "))) - 1;
-    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+    // Extract the ip address
+    std::string ip = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
     // Lambda to handle routing & ARP checks
     auto checkNetworkAccess = [&](const std::string& ip) -> bool {
@@ -307,10 +309,10 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     // Lights
     if (deviceType == "L") {
         mu_lightsCollection.lock();
-        if (requestType != "AL" && (lights.empty() || deviceNumber >= lights.size())) {
+        if (requestType != "AL" && (lights.empty() || lights.find(ip) == lights.end())) {
             response = "Failed. That is not recognised as a valid light.";
         }
-        else if (requestType != "AL" && !checkNetworkAccess(lights[deviceNumber].getIPAddress())) {
+        else if (requestType != "AL" && !checkNetworkAccess(ip)) {
             mu_lightsCollection.unlock();
             return false;
         }
@@ -318,7 +320,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             if (!lights.empty()) {
                 response = "Succeeded. ";
                 succeeded = true;
-                for (const auto& light : lights) response += light.getLocation() + " ";
+                for (const auto& light : lights) response += light.second.getLocation() + " " + light.first + " ";
             }
             else {
                 response = "Failed. There are no smart lights in the house.";
@@ -328,13 +330,13 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             response = "Succeeded. ";
             succeeded = true;
             if (requestType == "ON")
-                response += "The light is " + std::string(lights[deviceNumber].getOn() ? "on." : "off.");
+                response += "The light is " + std::string(lights[ip].getOn() ? "on." : "off.");
             else if (requestType == "LO")
-                response += "The light is located in the " + lights[deviceNumber].getLocation() + ".";
+                response += "The light is located in the " + lights[ip].getLocation() + ".";
             else if (requestType == "BO")
-                response += "The light bulb has " + std::string(lights[deviceNumber].getBurnedOut() ? "burned out." : "not burned out.");
+                response += "The light bulb has " + std::string(lights[ip].getBurnedOut() ? "burned out." : "not burned out.");
             else if (requestType == "ST")
-                response += lights[deviceNumber].getStatus();
+                response += lights[ip].getStatus();
         }
         mu_lightsCollection.unlock();
     }
@@ -342,10 +344,10 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     // Cameras
     else if (deviceType == "C") {
         mu_camerasCollection.lock();
-        if (requestType != "AL" && (cameras.empty() || deviceNumber >= cameras.size())) {
+        if (requestType != "AL" && (cameras.empty() || cameras.find(ip) == cameras.end())) {
             response = "Failed. That is not recognised as a valid camera.";
         }
-        else if (requestType != "AL" && !checkNetworkAccess(cameras[deviceNumber].getIPAddress())) {
+        else if (requestType != "AL" && !checkNetworkAccess(ip)) {
             mu_camerasCollection.unlock();
             return false;
         }
@@ -353,7 +355,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             if (!cameras.empty()) {
                 response = "Succeeded. ";
                 succeeded = true;
-                for (const auto& cam : cameras) response += cam.getLocation() + " ";
+                for (const auto& cam : cameras) response += cam.second.getLocation() + " " + cam.first + " ";;
             }
             else {
                 response = "Failed. There are no smart security cameras in the house.";
@@ -363,15 +365,15 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             response = "Succeeded. ";
             succeeded = true;
             if (requestType == "ON")
-                response += "The camera is " + std::string(cameras[deviceNumber].getOn() ? "on." : "off.");
+                response += "The camera is " + std::string(cameras[ip].getOn() ? "on." : "off.");
             else if (requestType == "LO")
-                response += "The camera is located in the " + cameras[deviceNumber].getLocation() + ".";
+                response += "The camera is located in the " + cameras[ip].getLocation() + ".";
             else if (requestType == "MA")
-                response += "The camera is " + std::string(cameras[deviceNumber].getIsMotionActivated() ? "motion activated." : "not motion activated.");
+                response += "The camera is " + std::string(cameras[ip].getIsMotionActivated() ? "motion activated." : "not motion activated.");
             else if (requestType == "MF")
-                response += "The camera's memory is " + std::string(cameras[deviceNumber].getMemoryIsFull() ? "full." : "not full.");
+                response += "The camera's memory is " + std::string(cameras[ip].getMemoryIsFull() ? "full." : "not full.");
             else if (requestType == "ST")
-                response += cameras[deviceNumber].getStatus();
+                response += cameras[ip].getStatus();
         }
         mu_camerasCollection.unlock();
     }
@@ -379,10 +381,10 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     // Thermostats
     else if (deviceType == "T") {
         mu_thermostatsCollection.lock();
-        if (requestType != "AL" && (thermostats.empty() || deviceNumber >= thermostats.size())) {
+        if (requestType != "AL" && (thermostats.empty() || thermostats.find(ip) == thermostats.end())) {
             response = "Failed. That is not recognised as a valid thermostat.";
         }
-        else if (requestType != "AL" && !checkNetworkAccess(thermostats[deviceNumber].getIPAddress())) {
+        else if (requestType != "AL" && !checkNetworkAccess(thermostats[ip].getIPAddress())) {
             mu_thermostatsCollection.unlock();
             return false;
         }
@@ -390,7 +392,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             if (!thermostats.empty()) {
                 response = "Succeeded. ";
                 succeeded = true;
-                for (const auto& t : thermostats) response += t.getLocation() + " ";
+                for (const auto& t : thermostats) response += t.second.getLocation() + " " + t.first + " ";;
             }
             else {
                 response = "Failed. There are no smart thermostats in the house.";
@@ -400,15 +402,15 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             response = "Succeeded. ";
             succeeded = true;
             if (requestType == "ON")
-                response += "The thermostat is " + std::string(thermostats[deviceNumber].getOn() ? "on." : "off.");
+                response += "The thermostat is " + std::string(thermostats[ip].getOn() ? "on." : "off.");
             else if (requestType == "LO")
-                response += "The thermostat is located in the " + thermostats[deviceNumber].getLocation() + ".";
+                response += "The thermostat is located in the " + thermostats[ip].getLocation() + ".";
             else if (requestType == "CT")
-                response += "The current temperature is " + std::to_string(thermostats[deviceNumber].getCurrentTemperature()) + "C.";
+                response += "The current temperature is " + std::to_string(thermostats[ip].getCurrentTemperature()) + "C.";
             else if (requestType == "DT")
-                response += "The desired/set temperature is " + std::to_string(thermostats[deviceNumber].getDesiredTemperature()) + "C.";
+                response += "The desired/set temperature is " + std::to_string(thermostats[ip].getDesiredTemperature()) + "C.";
             else if (requestType == "ST")
-                response += thermostats[deviceNumber].getStatus();
+                response += thermostats[ip].getStatus();
         }
         mu_thermostatsCollection.unlock();
     }
@@ -451,8 +453,8 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     }
 
     //Extract device number
-    int deviceNumber = std::stoi(requestDetails.substr(0, requestDetails.find(" "))) - 1;
-    requestDetails = requestDetails.substr(requestDetails.find(" ") + 1);
+    std::string ip = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
     //Lambda for network checks
     auto checkNetworkAccess = [&](const std::string& ip) -> bool {
@@ -475,10 +477,10 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     // Lights
     if (deviceType == "L") {
         mu_lightsCollection.lock();
-        if (lights.empty() || deviceNumber >= lights.size()) {
+        if (lights.empty() || lights.find(ip) == lights.end()) {
             response = "Failed. That is not recognised as a valid light.";
         }
-        else if (!checkNetworkAccess(lights[deviceNumber].getIPAddress())) {
+        else if (!checkNetworkAccess(ip)) {
             mu_lightsCollection.unlock();
             return false;
         }
@@ -486,22 +488,22 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             succeeded = true;
             std::cout << "[DEBUG] Request Type: '" << requestType << "'" << std::endl;
             if (requestType == "ON") {
-                lights[deviceNumber].turnOn();
+                lights[ip].turnOn();
                 response = "Succeeded. Light turned on.";
             }
             else if (requestType == "OF") {
-                lights[deviceNumber].turnOff();
+                lights[ip].turnOff();
                 response = "Succeeded. Light turned off.";
             }
             else if (requestType == "RB") {
-                lights[deviceNumber].replaceBulb();
+                lights[ip].replaceBulb();
                 response = "Succeeded. Bulb replaced.";
             }
             else if (requestType == "LK") {
                 // Attempt to lock the device
-                if (mu_lights[deviceNumber]->try_lock()){
+                if (mu_lights[ip]->try_lock()){
                     // This device was locked and the user can now examine it or make modifications to it
-                    response += "Succeeded. Loading Light " + std::to_string(deviceNumber + 1) + ".";
+                    response += "Succeeded. Loading Light.";
                     succeeded = true;
                 }
                 else {
@@ -510,8 +512,8 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
             else if (requestType == "UL") {
                 // Unlock the device
-                mu_lights[deviceNumber]->unlock();
-                response += "Succeeded. Light " + std::to_string(deviceNumber + 1) + " has been released.";
+                mu_lights[ip]->unlock();
+                response += "Succeeded. Light has been released.";
                 succeeded = true;
             }
             else {
@@ -525,32 +527,32 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     // Cameras
     else if (deviceType == "C") {
         mu_camerasCollection.lock();
-        if (cameras.empty() || deviceNumber >= cameras.size()) {
+        if (cameras.empty() || cameras.find(ip) == cameras.end()) {
             response = "Failed. That is not recognised as a valid camera.";
         }
-        else if (!checkNetworkAccess(cameras[deviceNumber].getIPAddress())) {
+        else if (!checkNetworkAccess(ip)) {
             mu_camerasCollection.unlock();
             return false;
         }
         else {
             succeeded = true;
             if (requestType == "ON") {
-                cameras[deviceNumber].turnOn();
+                cameras[ip].turnOn();
                 response = "Succeeded. Camera turned on.";
             }
             else if (requestType == "OF") {
-                cameras[deviceNumber].turnOff();
+                cameras[ip].turnOff();
                 response = "Succeeded. Camera turned off.";
             }
             else if (requestType == "WM") {
-                cameras[deviceNumber].wipeMemory();
+                cameras[ip].wipeMemory();
                 response = "Succeeded. Camera memory wiped.";
             }
             else if (requestType == "LK") {
                 // Attempt to lock the device
-                if (mu_cameras[deviceNumber]->try_lock()) {
+                if (mu_cameras[ip]->try_lock()) {
                     // This device was locked and the user can now examine it or make modifications to it
-                    response += "Succeeded. Loading Camera " + std::to_string(deviceNumber + 1) + ".";
+                    response += "Succeeded. Loading Camera.";
                     succeeded = true;
                 }
                 else {
@@ -559,8 +561,8 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
             else if (requestType == "UL") {
                 // Unlock the device
-                mu_cameras[deviceNumber]->unlock();
-                response += "Succeeded. Camera " + std::to_string(deviceNumber + 1) + " has been released.";
+                mu_cameras[ip]->unlock();
+                response += "Succeeded. Camera has been released.";
                 succeeded = true;
             }
             else {
@@ -574,26 +576,26 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     // Thermostats
     else if (deviceType == "T") {
         mu_thermostatsCollection.lock();
-        if (thermostats.empty() || deviceNumber >= thermostats.size()) {
+        if (thermostats.empty() || thermostats.find(ip) == thermostats.end()) {
             response = "Failed. That is not recognised as a valid thermostat.";
         }
-        else if (!checkNetworkAccess(thermostats[deviceNumber].getIPAddress())) {
+        else if (!checkNetworkAccess(ip)) {
             mu_thermostatsCollection.unlock();
             return false;
         }
         else {
             succeeded = true;
             if (requestType == "ON") {
-                thermostats[deviceNumber].turnOn();
+                thermostats[ip].turnOn();
                 response = "Succeeded. Thermostat turned on.";
             }
             else if (requestType == "OF") {
-                thermostats[deviceNumber].turnOff();
+                thermostats[ip].turnOff();
                 response = "Succeeded. Thermostat turned off.";
             }
             else if (requestType == "ST") {
                 int newTemp = std::stoi(requestDetails);
-                if (thermostats[deviceNumber].setDesiredTemperature(newTemp)) {
+                if (thermostats[ip].setDesiredTemperature(newTemp)) {
                     response = "Succeeded. Desired temperature set to " + std::to_string(newTemp) + "C.";
                 }
                 else {
@@ -603,9 +605,9 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
             else if (requestType == "LK") {
                 // Attempt to lock the device
-                if (mu_thermostats[deviceNumber]->try_lock()) {
+                if (mu_thermostats[ip]->try_lock()) {
                     // This device was locked and the user can now examine it or make modifications to it
-                    response += "Succeeded. Loading Thermostat " + std::to_string(deviceNumber + 1) + ".";
+                    response += "Succeeded. Loading Thermostat.";
                     succeeded = true;
                 }
                 else {
@@ -614,8 +616,8 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
             }
             else if (requestType == "UL") {
                 // Unlock the device
-                mu_thermostats[deviceNumber]->unlock();
-                response += "Succeeded. Thermostat " + std::to_string(deviceNumber + 1) + " has been released.";
+                mu_thermostats[ip]->unlock();
+                response += "Succeeded. Thermostat has been released.";
                 succeeded = true;
             }
             else {
@@ -678,14 +680,16 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
 
     if (deviceType == "L") {
         mu_lightsCollection.lock();
-        lights.push_back(seneca::Lights(location, false, false, ip));
+        lights[ip] = seneca::Lights(location, false, false, ip);
+        mu_lights[ip] = std::make_unique<std::mutex>();
         mu_lightsCollection.unlock();
         response = "Succeeded. Light added at " + location;
         succeeded = true;
     }
     else if (deviceType == "C") {
         mu_camerasCollection.lock();
-        cameras.push_back(seneca::SecurityCameras(location, false, false, false, ip));
+        cameras[ip] = seneca::SecurityCameras(location, false, false, false, ip);
+        mu_cameras[ip] = std::make_unique<std::mutex>();
         mu_camerasCollection.unlock();
         response = "Succeeded. Camera added at " + location;
         succeeded = true;
@@ -695,7 +699,8 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
         int desTemp = std::stoi(parseNext(requestDetails));
 
         mu_thermostatsCollection.lock();
-        thermostats.push_back(seneca::Thermostat(location, curTemp, desTemp, false, ip));
+        thermostats[ip] = seneca::Thermostat(location, curTemp, desTemp, false, ip);
+        mu_thermostats[ip] = std::make_unique<std::mutex>();
         mu_thermostatsCollection.unlock();
         response = "Succeeded. Thermostat added at " + location;
         succeeded = true;
