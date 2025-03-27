@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <bitset>
 #include <sstream>
+#include <memory>
 
 #include "SmartDevices.h"
 #include "Lights.h"
@@ -43,12 +44,18 @@ std::unordered_map<std::string, std::string> arpTable = {
     {"192.168.3.1", "AA:BB:CC:DD:EE:03"}
 };
 
-// A mutex to lock the lights array so that there are no race conditions
-std::mutex mu_lights;
-// A mutex to lock the cameras array so that there are no race conditions
-std::mutex mu_cameras;
-// A mutex to lock the thermostats array so that there are no race conditions
-std::mutex mu_thermostats;
+// A mutex to lock the lights collection so that there are no race conditions
+std::mutex mu_lightsCollection;
+// A mutex to lock the cameras collection so that there are no race conditions
+std::mutex mu_camerasCollection;
+// A mutex to lock the thermostats collection so that there are no race conditions
+std::mutex mu_thermostatsCollection;
+// An array of smart pointers to mutexes (so that they work with a vector) to lock the lights devices so that there are no race conditions
+std::vector<std::unique_ptr<std::mutex>> mu_lights;
+// An array of smart pointers to mutexes (so that they work with a vector) to lock the cameras devices so that there are no race conditions
+std::vector<std::unique_ptr<std::mutex>> mu_cameras;
+// An array of smart pointers to mutexes (so that they work with a vector) to lock the thermostats devices array so that there are no race conditions
+std::vector<std::unique_ptr<std::mutex>> mu_thermostats;
 // A mutex to lock the logged in users collection so that there are no race conditions
 std::mutex mu_loggedInUsers;
 // Vector to store the smart lights in the home (shared resource across threads)
@@ -98,6 +105,7 @@ bool routeExists(const std::string& ip) {
     }
     return false;
 }
+
 /// <summary>
 /// Simulates ARP Resolution by looking up an IP address in the ARP table
 /// </summary>
@@ -120,10 +128,13 @@ void load()
 {
     // Just load one light for now for testing purposes
     lights.push_back(seneca::Lights("Bedroom", false, false, "192.168.1.1"));
+    mu_lights.push_back(std::make_unique<std::mutex>());
     // Just load one camera for now for testing purposes
     cameras.push_back(seneca::SecurityCameras("Kitchen", false, false, false, "192.168.3.1"));
+    mu_cameras.push_back(std::make_unique<std::mutex>());
     // Just load one thermostat for now for testing purposes
     thermostats.push_back(seneca::Thermostat("Living-Room", 18, 21, true, "192.168.2.1"));
+    mu_thermostats.push_back(std::make_unique<std::mutex>());
 }
 
 /// <summary>
@@ -293,14 +304,14 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
         return true;
         };
 
-    //Lights
+    // Lights
     if (deviceType == "L") {
-        mu_lights.lock();
+        mu_lightsCollection.lock();
         if (requestType != "AL" && (lights.empty() || deviceNumber >= lights.size())) {
             response = "Failed. That is not recognised as a valid light.";
         }
         else if (requestType != "AL" && !checkNetworkAccess(lights[deviceNumber].getIPAddress())) {
-            mu_lights.unlock();
+            mu_lightsCollection.unlock();
             return false;
         }
         else if (requestType == "AL") {
@@ -325,16 +336,17 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             else if (requestType == "ST")
                 response += lights[deviceNumber].getStatus();
         }
-        mu_lights.unlock();
+        mu_lightsCollection.unlock();
     }
 
-    //Cameras
+    // Cameras
     else if (deviceType == "C") {
-        mu_cameras.lock();
+        mu_camerasCollection.lock();
         if (requestType != "AL" && (cameras.empty() || deviceNumber >= cameras.size())) {
             response = "Failed. That is not recognised as a valid camera.";
         }
         else if (requestType != "AL" && !checkNetworkAccess(cameras[deviceNumber].getIPAddress())) {
+            mu_camerasCollection.unlock();
             return false;
         }
         else if (requestType == "AL") {
@@ -361,16 +373,17 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             else if (requestType == "ST")
                 response += cameras[deviceNumber].getStatus();
         }
-        mu_cameras.unlock();
+        mu_camerasCollection.unlock();
     }
 
-    //Thermostats
+    // Thermostats
     else if (deviceType == "T") {
-        mu_thermostats.lock();
+        mu_thermostatsCollection.lock();
         if (requestType != "AL" && (thermostats.empty() || deviceNumber >= thermostats.size())) {
             response = "Failed. That is not recognised as a valid thermostat.";
         }
         else if (requestType != "AL" && !checkNetworkAccess(thermostats[deviceNumber].getIPAddress())) {
+            mu_thermostatsCollection.unlock();
             return false;
         }
         else if (requestType == "AL") {
@@ -397,7 +410,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
             else if (requestType == "ST")
                 response += thermostats[deviceNumber].getStatus();
         }
-        mu_thermostats.unlock();
+        mu_thermostatsCollection.unlock();
     }
 
     send(clientSocket, response.c_str(), response.size(), 0);
@@ -459,14 +472,14 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
         };
 
 
-    //Lights
+    // Lights
     if (deviceType == "L") {
-        mu_lights.lock();
-
+        mu_lightsCollection.lock();
         if (lights.empty() || deviceNumber >= lights.size()) {
             response = "Failed. That is not recognised as a valid light.";
         }
         else if (!checkNetworkAccess(lights[deviceNumber].getIPAddress())) {
+            mu_lightsCollection.unlock();
             return false;
         }
         else {
@@ -484,23 +497,39 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
                 lights[deviceNumber].replaceBulb();
                 response = "Succeeded. Bulb replaced.";
             }
+            else if (requestType == "LK") {
+                // Attempt to lock the device
+                if (mu_lights[deviceNumber]->try_lock()){
+                    // This device was locked and the user can now examine it or make modifications to it
+                    response += "Succeeded. Loading Light " + std::to_string(deviceNumber + 1) + ".";
+                    succeeded = true;
+                }
+                else {
+                    response += "Failed. This light is already being examined by another user, try again later.";
+                }
+            }
+            else if (requestType == "UL") {
+                // Unlock the device
+                mu_lights[deviceNumber]->unlock();
+                response += "Succeeded. Light " + std::to_string(deviceNumber + 1) + " has been released.";
+                succeeded = true;
+            }
             else {
                 succeeded = false;
                 response = "Failed. Unknown request type for light.";
             }
         }
-
-        mu_lights.unlock();
+        mu_lightsCollection.unlock();
     }
 
-    //Cameras
+    // Cameras
     else if (deviceType == "C") {
-        mu_cameras.lock();
-
+        mu_camerasCollection.lock();
         if (cameras.empty() || deviceNumber >= cameras.size()) {
             response = "Failed. That is not recognised as a valid camera.";
         }
         else if (!checkNetworkAccess(cameras[deviceNumber].getIPAddress())) {
+            mu_camerasCollection.unlock();
             return false;
         }
         else {
@@ -517,23 +546,39 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
                 cameras[deviceNumber].wipeMemory();
                 response = "Succeeded. Camera memory wiped.";
             }
+            else if (requestType == "LK") {
+                // Attempt to lock the device
+                if (mu_cameras[deviceNumber]->try_lock()) {
+                    // This device was locked and the user can now examine it or make modifications to it
+                    response += "Succeeded. Loading Camera " + std::to_string(deviceNumber + 1) + ".";
+                    succeeded = true;
+                }
+                else {
+                    response += "Failed. This security camera is already being examined by another user, try again later.";
+                }
+            }
+            else if (requestType == "UL") {
+                // Unlock the device
+                mu_cameras[deviceNumber]->unlock();
+                response += "Succeeded. Camera " + std::to_string(deviceNumber + 1) + " has been released.";
+                succeeded = true;
+            }
             else {
                 succeeded = false;
                 response = "Failed. Unknown request type for camera.";
             }
         }
-
-        mu_cameras.unlock();
+        mu_camerasCollection.unlock();
     }
 
-    //Thermostats
+    // Thermostats
     else if (deviceType == "T") {
-        mu_thermostats.lock();
-
+        mu_thermostatsCollection.lock();
         if (thermostats.empty() || deviceNumber >= thermostats.size()) {
             response = "Failed. That is not recognised as a valid thermostat.";
         }
         else if (!checkNetworkAccess(thermostats[deviceNumber].getIPAddress())) {
+            mu_thermostatsCollection.unlock();
             return false;
         }
         else {
@@ -556,20 +601,35 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
                     response = "Failed. Temperature must be between 2C and 35C.";
                 }
             }
+            else if (requestType == "LK") {
+                // Attempt to lock the device
+                if (mu_thermostats[deviceNumber]->try_lock()) {
+                    // This device was locked and the user can now examine it or make modifications to it
+                    response += "Succeeded. Loading Thermostat " + std::to_string(deviceNumber + 1) + ".";
+                    succeeded = true;
+                }
+                else {
+                    response += "Failed. This thermostat is already being examined by another user, try again later.";
+                }
+            }
+            else if (requestType == "UL") {
+                // Unlock the device
+                mu_thermostats[deviceNumber]->unlock();
+                response += "Succeeded. Thermostat " + std::to_string(deviceNumber + 1) + " has been released.";
+                succeeded = true;
+            }
             else {
                 succeeded = false;
                 response = "Failed. Unknown request type for thermostat.";
             }
         }
-
-        mu_thermostats.unlock();
+        mu_thermostatsCollection.unlock();
     }
 
     // Send response
     send(clientSocket, response.c_str(), response.size(), 0);
     return succeeded;
 }
-
 
 // Not implemented yet
 bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
@@ -617,16 +677,16 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     arpTable[ip] = mac;
 
     if (deviceType == "L") {
-        mu_lights.lock();
+        mu_lightsCollection.lock();
         lights.push_back(seneca::Lights(location, false, false, ip));
-        mu_lights.unlock();
+        mu_lightsCollection.unlock();
         response = "Succeeded. Light added at " + location;
         succeeded = true;
     }
     else if (deviceType == "C") {
-        mu_cameras.lock();
+        mu_camerasCollection.lock();
         cameras.push_back(seneca::SecurityCameras(location, false, false, false, ip));
-        mu_cameras.unlock();
+        mu_camerasCollection.unlock();
         response = "Succeeded. Camera added at " + location;
         succeeded = true;
     }
@@ -634,9 +694,9 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
         int curTemp = std::stoi(parseNext(requestDetails));
         int desTemp = std::stoi(parseNext(requestDetails));
 
-        mu_thermostats.lock();
+        mu_thermostatsCollection.lock();
         thermostats.push_back(seneca::Thermostat(location, curTemp, desTemp, false, ip));
-        mu_thermostats.unlock();
+        mu_thermostatsCollection.unlock();
         response = "Succeeded. Thermostat added at " + location;
         succeeded = true;
     }
