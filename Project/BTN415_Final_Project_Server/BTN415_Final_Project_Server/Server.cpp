@@ -839,6 +839,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Ready to accept a connection" << std::endl;
         Aux_Socket = accept(ListenSocket, NULL, NULL);
         if (Aux_Socket == SOCKET_ERROR) {
+            WSACleanup();
             return 0;
         }
         else {

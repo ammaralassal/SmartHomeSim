@@ -26,7 +26,7 @@ std::string getMenuChoice(const int& min, const int& max)
         if (std::stoi(choice) < min || std::stoi(choice) > max)
         {
             // Choice was invalid, inform user and try again
-            std::cout << "Whoops, " << choice << " wasn't a valid option. Please try again with a number between " << min << " and " << max << ", inclusive.\n\n";
+            std::cout << "That " << choice << " wasn't a valid option. Please try again with a number between " << min << " and " << max << ", inclusive.\n\n";
         }
         else
         {
@@ -183,7 +183,7 @@ bool login(SOCKET& clientSocket, std::string& username) {
         if (result == "Succeeded")
         {
             // Login succeeded, inform user
-            std::cout << "\nCongradulations, the login succeeded!" << explaination << std::endl << std::endl;
+            std::cout << "\nCongratulations, the login succeeded!" << explaination << std::endl << std::endl;
             succeeded = true;
             username = inputUsername;
         }
@@ -218,11 +218,11 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
     while (choice != "0")
     {
         // Display options
-        std::cout << "What would you like to do with this light?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if bulb has burned out\n5. Replace bulb\n6. Check location\n7. Get full status report\n";
+        std::cout << "What would you like to do with this light?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if bulb has burned out\n5. Replace bulb\n6. Check location\n7. Get full status report\n8. Get IP address\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Lights Menu.\n";
         // Collect the user's choice
-        choice = getMenuChoice(0, 7);
+        choice = getMenuChoice(0, 8);
 
         switch (std::stoi(choice)) {
         case 1:
@@ -253,6 +253,10 @@ void light(SOCKET& ClientSocket, const std::string& username, const std::string&
             // Get a full status report on the bulb
             getDetails("L", "ST", ClientSocket, username, ip);
             break;
+        case 8:
+            // Get the ip address
+            std::cout << std::endl << "The device's ip address is " << ip << std::endl << std::endl;
+            break;
         }
     }
     // Release the lock on the light
@@ -277,11 +281,11 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
     while (choice != "0")
     {
         // Display options
-        std::cout << "What would you like to do with this thermostat?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check the current temperature\n5. Check the set temperature\n6. Set a new temperature\n7. Check location\n8. Get full status report\n";
+        std::cout << "What would you like to do with this thermostat?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check the current temperature\n5. Check the set temperature\n6. Set a new temperature\n7. Check location\n8. Get full status report\n9. Get ip address\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Thermostat Menu.\n";
         // Collect the user's choice
-        choice = getMenuChoice(0, 8);
+        choice = getMenuChoice(0, 9);
 
         switch (std::stoi(choice)) {
         case 1:
@@ -315,6 +319,10 @@ void thermostat(SOCKET& ClientSocket, const std::string& username, const std::st
         case 8:
             // Get a full status report on the thermostat
             getDetails("T", "ST", ClientSocket, username, ip);
+            break; 
+        case 9:
+            // Get the ip address
+            std::cout << std::endl << "The device's ip address is " << ip << std::endl << std::endl;
             break;
         }
     }
@@ -340,11 +348,11 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
     while (choice != "0")
     {
         // Display options
-        std::cout << "What would you like to do with this security camera?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if memory is full\n5. Empty memory\n6. Check location\n7. Check if motion activated\n8. Get full status report\n";
+        std::cout << "What would you like to do with this security camera?\n1. Check if on\n2. Turn on\n3. Turn off\n4. Check if memory is full\n5. Empty memory\n6. Check location\n7. Check if motion activated\n8. Get full status report\n9. Get IP address\n";
         // Prompt for input
         std::cout << "\nPlease enter the number corresponding to your request, or 0 to return to the Cameras Menu.\n";
         // Collect the user's choice
-        choice = getMenuChoice(0, 8);
+        choice = getMenuChoice(0, 9);
 
         switch (std::stoi(choice)) {
         case 1:
@@ -378,6 +386,10 @@ void camera(SOCKET& ClientSocket, const std::string& username, const std::string
         case 8:
             // Get a full status report on the camera
             getDetails("C", "ST", ClientSocket, username, ip);
+            break;
+        case 9:
+            // Get the ip address
+            std::cout << std::endl << "The device's ip address is " << ip << std::endl << std::endl;
             break;
         }
     }
@@ -855,7 +867,7 @@ int main() {
                     if (!(choice == "1" || choice == "2" || choice == "3" || choice == "4"))
                     {
                         // Choice was invalid, inform user and try again
-                        std::cout << "Whoops," << choice << " wasn't a valid option. Please try again with a number between 1 and 4, inclusive.\n\n";
+                        std::cout << "That" << choice << " wasn't a valid option. Please try again with a number between 1 and 4, inclusive.\n\n";
                     }
 
                 } while (choice != "1" && choice != "2" && choice != "3" && choice != "4");
