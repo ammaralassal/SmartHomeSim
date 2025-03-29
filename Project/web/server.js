@@ -1,4 +1,3 @@
-// Refactored Express.js server with control routes added
 const express = require('express');
 const net = require('net');
 const cors = require('cors');
@@ -229,8 +228,6 @@ app.put('/cameras/:ip/memory/wipe', async (req, res) => {
   }
 });
 
-
-// ===== STATUS QUERIES (GET) =====
 app.get('/lights/:ip/status/on', async (req, res) => {
   const { ip } = req.params;
   const { username } = req.query;
