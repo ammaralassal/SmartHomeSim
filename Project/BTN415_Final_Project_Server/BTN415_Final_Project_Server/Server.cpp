@@ -129,10 +129,10 @@ bool Active_Sockets[MAX_SOCKETS + 1] = { false };
 void load()
 {
     // Just load one light for now for testing purposes
-    lights["192.168.1.1"] = seneca::Lights("Bedroom", false, false, "192.168.1.1");
+    lights["192.168.1.1"] = seneca::Lights("Bedroom", true, false, "192.168.1.1");
     mu_lights["192.168.1.1"] = std::make_unique<std::mutex>();
     // Just load one camera for now for testing purposes
-    cameras["192.168.3.1"] = seneca::SecurityCameras("Kitchen", false, false, false, "192.168.3.1");
+    cameras["192.168.3.1"] = seneca::SecurityCameras("Kitchen", true, true, false, "192.168.3.1");
     mu_cameras["192.168.3.1"] = std::make_unique<std::mutex>();
     // Just load one thermostat for now for testing purposes
     thermostats["192.168.2.1"] = seneca::Thermostat("Living-Room", 18, 21, true, "192.168.2.1");
@@ -310,7 +310,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (deviceType == "L") {
         mu_lightsCollection.lock();
         if (requestType != "AL" && (lights.empty() || lights.find(ip) == lights.end())) {
-            response = "Failed. That is not recognised as a valid light.";
+            response = "Failed. That is not recognised as a valid light, it may have been deleted by another user.";
         }
         else if (requestType != "AL" && !checkNetworkAccess(ip)) {
             mu_lightsCollection.unlock();
@@ -345,7 +345,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     else if (deviceType == "C") {
         mu_camerasCollection.lock();
         if (requestType != "AL" && (cameras.empty() || cameras.find(ip) == cameras.end())) {
-            response = "Failed. That is not recognised as a valid camera.";
+            response = "Failed. That is not recognised as a valid camera, it may have been deleted by another user.";
         }
         else if (requestType != "AL" && !checkNetworkAccess(ip)) {
             mu_camerasCollection.unlock();
@@ -382,7 +382,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     else if (deviceType == "T") {
         mu_thermostatsCollection.lock();
         if (requestType != "AL" && (thermostats.empty() || thermostats.find(ip) == thermostats.end())) {
-            response = "Failed. That is not recognised as a valid thermostat.";
+            response = "Failed. That is not recognised as a valid thermostat, it may have been deleted by another user.";
         }
         else if (requestType != "AL" && !checkNetworkAccess(thermostats[ip].getIPAddress())) {
             mu_thermostatsCollection.unlock();
@@ -427,7 +427,6 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
 /// <returns>True if request could be fulfilled; false otherwise</returns>
 bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
 {
-
     std::string response;
     bool succeeded = false;
 
@@ -478,7 +477,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (deviceType == "L") {
         mu_lightsCollection.lock();
         if (lights.empty() || lights.find(ip) == lights.end()) {
-            response = "Failed. That is not recognised as a valid light.";
+            response = "Failed. That is not recognised as a valid light, it may have been deleted by another user.";
         }
         else if (!checkNetworkAccess(ip)) {
             mu_lightsCollection.unlock();
@@ -528,7 +527,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     else if (deviceType == "C") {
         mu_camerasCollection.lock();
         if (cameras.empty() || cameras.find(ip) == cameras.end()) {
-            response = "Failed. That is not recognised as a valid camera.";
+            response = "Failed. That is not recognised as a valid camera, it may have been deleted by another user..";
         }
         else if (!checkNetworkAccess(ip)) {
             mu_camerasCollection.unlock();
@@ -577,7 +576,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     else if (deviceType == "T") {
         mu_thermostatsCollection.lock();
         if (thermostats.empty() || thermostats.find(ip) == thermostats.end()) {
-            response = "Failed. That is not recognised as a valid thermostat.";
+            response = "Failed. That is not recognised as a valid thermostat, it may have been deleted by another user..";
         }
         else if (!checkNetworkAccess(ip)) {
             mu_thermostatsCollection.unlock();
@@ -639,8 +638,11 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     std::string response;
     bool succeeded = false;
 
-    // Parse: POST/<deviceType>/<username>/<...>
+    // Parse: POST/<deviceType>/<requestType>/<username>/<location>/<ip>/<...>
     std::string deviceType = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1); 
+    
+    std::string requestType = requestDetails.substr(0, requestDetails.find("/"));
     requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
 
     std::string username = requestDetails.substr(0, requestDetails.find("/"));
@@ -679,16 +681,23 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     arpTable[ip] = mac;
 
     if (deviceType == "L") {
+        bool burnedOut = parseNext(requestDetails) != "";
+        bool isOn = parseNext(requestDetails) != "";
+
         mu_lightsCollection.lock();
-        lights[ip] = seneca::Lights(location, false, false, ip);
+        lights[ip] = seneca::Lights(location, burnedOut, isOn, ip);
         mu_lights[ip] = std::make_unique<std::mutex>();
         mu_lightsCollection.unlock();
         response = "Succeeded. Light added at " + location;
         succeeded = true;
     }
     else if (deviceType == "C") {
+        bool memoryIsFull = parseNext(requestDetails) != "";
+        bool isMotionActivated = parseNext(requestDetails) != "";
+        bool isOn = parseNext(requestDetails) != "";
+
         mu_camerasCollection.lock();
-        cameras[ip] = seneca::SecurityCameras(location, false, false, false, ip);
+        cameras[ip] = seneca::SecurityCameras(location, memoryIsFull, isMotionActivated, isOn, ip);
         mu_cameras[ip] = std::make_unique<std::mutex>();
         mu_camerasCollection.unlock();
         response = "Succeeded. Camera added at " + location;
@@ -697,9 +706,10 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     else if (deviceType == "T") {
         int curTemp = std::stoi(parseNext(requestDetails));
         int desTemp = std::stoi(parseNext(requestDetails));
+        bool isOn = parseNext(requestDetails) != "";
 
         mu_thermostatsCollection.lock();
-        thermostats[ip] = seneca::Thermostat(location, curTemp, desTemp, false, ip);
+        thermostats[ip] = seneca::Thermostat(location, curTemp, desTemp, isOn, ip);
         mu_thermostats[ip] = std::make_unique<std::mutex>();
         mu_thermostatsCollection.unlock();
         response = "Succeeded. Thermostat added at " + location;
@@ -709,6 +719,138 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
         response = "Failed. Invalid device type.";
     }
 
+    send(clientSocket, response.c_str(), response.size(), 0);
+    return succeeded;
+}
+
+bool deleteDetails(SOCKET& clientSocket, std::string& requestDetails)
+{
+    std::string response;
+    bool succeeded = false;
+
+    // Extract request components
+    std::string deviceType = requestDetails.substr(0, requestDetails.find("/"));
+    std::cout << "[DEBUG] Raw Request: '" << requestDetails << "'" << std::endl;
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+    // Parse the requestType so it doesn't break subsequent runs...
+    std::string requestType = requestDetails.substr(0, requestDetails.find("/"));
+    std::cout << "[DEBUG] Request Type: '" << requestType << "'" << std::endl;
+    requestType.erase(remove_if(requestType.begin(), requestType.end(), ::isspace), requestType.end());
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+    std::string username = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+    //Check login
+    if (isLoggedIn(username)) {
+        response = "Failed. Server does not recognise the user as being logged in.";
+        send(clientSocket, response.c_str(), response.size(), 0);
+        return false;
+    }
+
+    //Extract device number
+    std::string ip = requestDetails.substr(0, requestDetails.find("/"));
+    requestDetails = requestDetails.substr(requestDetails.find("/") + 1);
+
+    //Lambda for network checks
+    auto checkNetworkAccess = [&](const std::string& ip) -> bool {
+        if (!routeExists(ip)) {
+            response = "Failed. No route to device " + ip + ".";
+            send(clientSocket, response.c_str(), response.size(), 0);
+            return false;
+        }
+        std::string mac = resolveMAC(ip);
+        std::cout << "Resolved IP " << ip << " to MAC " << mac << std::endl;
+        if (mac == "00:00:00:00:00:00") {
+            response = "Failed. MAC address could not be resolved for " + ip + ".";
+            send(clientSocket, response.c_str(), response.size(), 0);
+            return false;
+        }
+        return true;
+        };
+
+
+    // Lights
+    if (deviceType == "L") {
+        mu_lightsCollection.lock();
+        if (lights.empty() || lights.find(ip) == lights.end()) {
+            response = "Failed. That is not recognised as a valid light.";
+        }
+        else if (!checkNetworkAccess(ip)) {
+            mu_lightsCollection.unlock();
+            return false;
+        }
+        else {
+            succeeded = true;
+            std::cout << "[DEBUG] Request Type: '" << requestType << "'" << std::endl;
+            if (requestType == "DD") {
+                // Delete the device
+                lights.erase(ip);
+                mu_lights.erase(ip);
+                response = "Success. The light with the IP address " + ip + " has been removed.";
+            }
+            else {
+                succeeded = false;
+                response = "Failed. Unknown request type for light.";
+            }
+        }
+        mu_lightsCollection.unlock();
+    }
+
+    // Cameras
+    else if (deviceType == "C") {
+        mu_camerasCollection.lock();
+        if (cameras.empty() || cameras.find(ip) == cameras.end()) {
+            response = "Failed. That is not recognised as a valid camera.";
+        }
+        else if (!checkNetworkAccess(ip)) {
+            mu_camerasCollection.unlock();
+            return false;
+        }
+        else {
+            succeeded = true;
+            if (requestType == "DD") {
+                // Delete the device
+                cameras.erase(ip);
+                mu_cameras.erase(ip);
+                response = "Success. The security camera with the IP address " + ip + " has been removed.";
+            }
+            else {
+                succeeded = false;
+                response = "Failed. Unknown request type for camera.";
+            }
+        }
+        mu_camerasCollection.unlock();
+    }
+
+    // Thermostats
+    else if (deviceType == "T") {
+        mu_thermostatsCollection.lock();
+        if (thermostats.empty() || thermostats.find(ip) == thermostats.end()) {
+            response = "Failed. That is not recognised as a valid thermostat.";
+        }
+        else if (!checkNetworkAccess(ip)) {
+            mu_thermostatsCollection.unlock();
+            return false;
+        }
+        else {
+            succeeded = true;
+            if (requestType == "DD") {
+                // Delete the device
+                thermostats.erase(ip);
+                mu_thermostats.erase(ip);
+                response = "Success. The thermostat with the IP address " + ip + " has been removed.";
+            }
+            else {
+                succeeded = false;
+                response = "Failed. Unknown request type for thermostat.";
+            }
+        }
+        mu_thermostatsCollection.unlock();
+    }
+
+    // Send response
     send(clientSocket, response.c_str(), response.size(), 0);
     return succeeded;
 }
@@ -756,6 +898,8 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
                     signIn(ClientSockets[Index], requestDetails, usernames, passwords);
                 }
                 else {
+                    // Put the type back and send in the request
+                    requestDetails = type + "/" + requestDetails;
                     postDetails(ClientSockets[Index], requestDetails);
                 }
             }
@@ -771,6 +915,11 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
 
                 if (type == "USER") {
                     signOut(ClientSockets[Index], requestDetails);
+                }
+                else {
+                    // Put the type back and send in the request
+                    requestDetails = type + "/" + requestDetails;
+                    deleteDetails(ClientSockets[Index], requestDetails);
                 }
             }
             else if (action == "End") {
