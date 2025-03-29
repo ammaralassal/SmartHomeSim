@@ -213,6 +213,7 @@ bool signIn(SOCKET& clientSocket, const std::string& credentials, const std::vec
 
     // Send response to client
     send(clientSocket, response.c_str(), response.size(), 0);
+    closesocket(clientSocket);
 
     return succeeded;
 }
@@ -253,6 +254,7 @@ bool signOut(SOCKET& clientSocket, const std::string& username)
 
     // Send response to client
     send(clientSocket, response.c_str(), response.size(), 0);
+    closesocket(clientSocket);
 
     return succeeded;
 }
@@ -282,6 +284,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (isLoggedIn(username)) {
         response = "Failed. Server does not recognise the user as being logged in.";
         send(clientSocket, response.c_str(), response.size(), 0);
+        closesocket(clientSocket);
         return false;
     }
 
@@ -294,6 +297,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
         if (!routeExists(ip)) {
             response = "Failed. No route to device " + ip + ".";
             send(clientSocket, response.c_str(), response.size(), 0);
+            closesocket(clientSocket);
             return false;
         }
         std::string mac = resolveMAC(ip);
@@ -301,6 +305,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
         if (mac == "00:00:00:00:00:00") {
             response = "Failed. MAC address could not be resolved for " + ip + ".";
             send(clientSocket, response.c_str(), response.size(), 0);
+            closesocket(clientSocket);
             return false;
         }
         return true;
@@ -416,6 +421,7 @@ bool getDetails(SOCKET& clientSocket, std::string& requestDetails)
     }
 
     send(clientSocket, response.c_str(), response.size(), 0);
+    closesocket(clientSocket);
     return succeeded;
 }
 
@@ -448,6 +454,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (isLoggedIn(username)) {
         response = "Failed. Server does not recognise the user as being logged in.";
         send(clientSocket, response.c_str(), response.size(), 0);
+        closesocket(clientSocket);
         return false;
     }
 
@@ -460,6 +467,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
         if (!routeExists(ip)) {
             response = "Failed. No route to device " + ip + ".";
             send(clientSocket, response.c_str(), response.size(), 0);
+            closesocket(clientSocket);
             return false;
         }
         std::string mac = resolveMAC(ip);
@@ -467,6 +475,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
         if (mac == "00:00:00:00:00:00") {
             response = "Failed. MAC address could not be resolved for " + ip + ".";
             send(clientSocket, response.c_str(), response.size(), 0);
+            closesocket(clientSocket);
             return false;
         }
         return true;
@@ -629,6 +638,7 @@ bool putDetails(SOCKET& clientSocket, std::string& requestDetails)
 
     // Send response
     send(clientSocket, response.c_str(), response.size(), 0);
+    closesocket(clientSocket);
     return succeeded;
 }
 
@@ -651,6 +661,7 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (isLoggedIn(username)) {
         response = "Failed. Server does not recognise the user as being logged in.";
         send(clientSocket, response.c_str(), response.size(), 0);
+        closesocket(clientSocket);
         return false;
     }
 
@@ -668,12 +679,14 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (arpTable.find(ip) != arpTable.end()) {
         response = "Failed. Device with that IP already exists.";
         send(clientSocket, response.c_str(), response.size(), 0);
+        closesocket(clientSocket);
         return false;
     }
 
     if (!routeExists(ip)) {
         response = "Failed. IP does not match any valid subnet.";
         send(clientSocket, response.c_str(), response.size(), 0);
+        closesocket(clientSocket);
         return false;
     }
 
@@ -720,6 +733,7 @@ bool postDetails(SOCKET& clientSocket, std::string& requestDetails)
     }
 
     send(clientSocket, response.c_str(), response.size(), 0);
+    closesocket(clientSocket);
     return succeeded;
 }
 
@@ -746,6 +760,7 @@ bool deleteDetails(SOCKET& clientSocket, std::string& requestDetails)
     if (isLoggedIn(username)) {
         response = "Failed. Server does not recognise the user as being logged in.";
         send(clientSocket, response.c_str(), response.size(), 0);
+        closesocket(clientSocket);
         return false;
     }
 
@@ -758,6 +773,7 @@ bool deleteDetails(SOCKET& clientSocket, std::string& requestDetails)
         if (!routeExists(ip)) {
             response = "Failed. No route to device " + ip + ".";
             send(clientSocket, response.c_str(), response.size(), 0);
+            closesocket(clientSocket);
             return false;
         }
         std::string mac = resolveMAC(ip);
@@ -765,6 +781,7 @@ bool deleteDetails(SOCKET& clientSocket, std::string& requestDetails)
         if (mac == "00:00:00:00:00:00") {
             response = "Failed. MAC address could not be resolved for " + ip + ".";
             send(clientSocket, response.c_str(), response.size(), 0);
+            closesocket(clientSocket);
             return false;
         }
         return true;
@@ -852,6 +869,7 @@ bool deleteDetails(SOCKET& clientSocket, std::string& requestDetails)
 
     // Send response
     send(clientSocket, response.c_str(), response.size(), 0);
+    closesocket(clientSocket);
     return succeeded;
 }
 
@@ -896,6 +914,7 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
 
                 if (type == "USER") {
                     signIn(ClientSockets[Index], requestDetails, usernames, passwords);
+                    keepGoing = false;
                 }
                 else {
                     // Put the type back and send in the request
@@ -905,9 +924,11 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
             }
             else if (action == "GET") {
                 getDetails(ClientSockets[Index], requestDetails);
+                keepGoing = false;
             }
             else if (action == "PUT") {
                 putDetails(ClientSockets[Index], requestDetails);
+                keepGoing = false;
             }
             else if (action == "DELETE") {
                 std::string type = requestDetails.substr(0, requestDetails.find("/"));
@@ -915,11 +936,13 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
 
                 if (type == "USER") {
                     signOut(ClientSockets[Index], requestDetails);
+                    keepGoing = false;
                 }
                 else {
                     // Put the type back and send in the request
                     requestDetails = type + "/" + requestDetails;
                     deleteDetails(ClientSockets[Index], requestDetails);
+                    keepGoing = false;
                 }
             }
             else if (action == "End") {
@@ -932,7 +955,7 @@ void Run(int Index, const std::vector<std::string> usernames, const std::vector<
         }
     }
 
-    std::cout << "Closing Connection" << std::endl;
+    std::cout << "Request accepted" << std::endl;
     closesocket(ClientSockets[Index]);
     Active_Sockets[Index] = false;
 }
